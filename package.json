@@ -1,8 +1,7 @@
 {
-  "name": "ai-kannada-platform",
+  "name": "careerRedefine",
   "private": true,
   "version": "1.0.0",
-  "type": "module",
   "scripts": {
     "dev": "concurrently \"vite\" \"node server.js\"",
     "build": "vite build",
