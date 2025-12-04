@@ -10,22 +10,22 @@ if (process.env.NODE_ENV !== 'production') {
 dotenv.config({ path: './config.env', override: false });
 
 
-const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
-const morgan = require('morgan');
-const cookieParser = require('cookie-parser');
-const path = require('path');
-const fs = require('fs/promises');
-const cloudinary = require('cloudinary').v2;
-const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
-const rateLimit = require('express-rate-limit');
-const hpp = require('hpp');
-const helmet = require('helmet');
-const session = require('express-session');
-const MongoStore = require('connect-mongo')(session);
-
+import express from 'express';
+import cors from 'cors';
+import mongoose from 'mongoose';
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import path from 'path';
+import fs from 'fs/promises';
+import { fileURLToPath } from 'url';
+import { v2 as cloudinary } from 'cloudinary';
+import mongoSanitize from 'express-mongo-sanitize';
+import xss from 'xss-clean';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import hpp from 'hpp';
+import helmet from 'helmet';
+import session from 'express-session';
+import MongoStore from 'connect-mongo';
 // Inline routing: controllers and auth middleware
 import * as courseController from './controllers/courseController.js';
 import * as jobController from './controllers/jobController.js';
@@ -202,19 +202,6 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-app.use(
-  session({
-    secret: 'careerredefinebyshannu',
-    resave: false,
-    saveUninitialized: true,
-    store: new MongoStore({
-      url: 'mongodb+srv://careerredefinee_db_user:AaBb12%4012@careerredefine.qqk8sno.mongodb.net/?retryWrites=true&w=majority&appName=careerredefine',
-      ttl: 14 * 24 * 60 * 60
-    })
-  })
-);
-
-
 // Body parser, reading data from body into req.body
 // Increased limit to support large HTML pastes from admin Optional page
 app.use(express.json({ limit: '2mb' }));
@@ -265,14 +252,14 @@ const allowedOrigins = [
   /^https?:\/\/([a-z0-9-]+\.)*career-redefine\.onrender\.com$/,
   
   // Specific production URLs
-  'https://test.careerredefine.com',
-  'https://www.test.careerredefine.com',
+  'https://test.testing.testing.careerredefine.com',
+  'https://www.test.testing.testing.careerredefine.com',
 
-  'https://testing.careerredefine.com',
+  'https://testing.testing.careerredefine.com',
   'https://www.test5-x7xt.onrender.com',
 
   // Second testing domain
-  'https://testing.careerredefine.com',
+  'https://testing.testing.careerredefine.com',
 
   'https://test.career-redefine.vercel.app',
   'https://test.career-redefine.com'
@@ -1310,7 +1297,7 @@ const startServer = async () => {
     // Initialize Socket.IO for realtime group chat
     const io = new SocketIOServer(serverInstance, {
       cors: {
-        origin: ['http://localhost:5173', 'http://127.0.0.1:5173','https://testing.careerredefine.com'],
+        origin: ['http://localhost:5173', 'http://127.0.0.1:5173','https://testing.testing.careerredefine.com'],
         credentials: true,
       },
     });
