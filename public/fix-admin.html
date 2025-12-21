@@ -66,6 +66,8 @@
     <div id="message"></div>
 
     <script>
+    const API_BASE = window.location.origin;
+
     async function fixAdmin() {
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
@@ -78,7 +80,7 @@
             
             const loginResponse = await axios({
                 method: 'post',
-                url: 'http://localhost:3000/api/v1/auth/login',
+                url: `${API_BASE}/api/v1/auth/login`,
                 data: { email, password },
                 withCredentials: true,
                 validateStatus: () => true // Don't throw on HTTP error
@@ -96,7 +98,7 @@
             
             const signupResponse = await axios({
                 method: 'post',
-                url: 'http://localhost:3000/api/v1/auth/signup',
+                url: `${API_BASE}/api/v1/auth/signup`,
                 data: {
                     name: 'Admin User',
                     email,

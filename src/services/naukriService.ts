@@ -16,11 +16,12 @@ export type NaukriJob = {
 export const naukriService = {
   getJobs: async (params: { keywords?: string; location?: string; page?: number; limit?: number } = {}): Promise<NaukriJob[]> => {
     try {
-      // Use backend proxy to avoid exposing secrets and to bypass CORS
-      // In dev, the frontend runs on Vite (5173) and the backend on 3000.
-      // If we call window.origin when on 5173, we'll hit Vite and get HTML instead of JSON.
+      // Use backend proxy to avoid exposing secrets and to bypass CORS.
+      // Prefer explicit env override, then current origin (covers SSR/preview), then production API.
       const apiBase = (import.meta as any)?.env?.VITE_API_BASE
-        || (typeof window !== 'undefined' && window.location.port === '5173' ? 'http://localhost:3000' : window.location.origin);
+        || (typeof window !== 'undefined' && window.location?.origin)
+        || (import.meta as any)?.env?.VITE_API_URL
+        || 'https://testing.careerredefine.com';
       const url = new URL('/api/v1/external/naukri', apiBase);
       if (params.keywords) url.searchParams.set('keywords', params.keywords);
       if (params.location) url.searchParams.set('location', params.location);

@@ -32,6 +32,8 @@
     <div id="output">Click a button to test an endpoint...</div>
 
     <script>
+    const API_BASE = window.location.origin;
+
     async function testEndpoint(endpoint, method = 'GET', data = null) {
         const output = document.getElementById('output');
         output.textContent = `Testing ${method} ${endpoint}...`;
@@ -39,7 +41,7 @@
         try {
             const config = {
                 method,
-                url: `http://localhost:3000${endpoint}`,
+                url: `${API_BASE}${endpoint}`,
                 withCredentials: true,
                 validateStatus: () => true
             };

@@ -1,14 +1,15 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 // Base URL strategy:
-// - If VITE_API_URL is defined, prefer it everywhere.
-// - During Vite dev (localhost:5173) hit the local backend.
-// - Otherwise default to the deployed API URL.
+// - Prefer explicit VITE_API_URL everywhere.
+// - Otherwise use the current origin if running in a browser.
+// - Final fallback is the deployed production API URL.
 const VITE_ENV: any = (import.meta as any).env || {};
 const DEFAULT_API_URL = 'https://testing.careerredefine.com';
 const API_URL: string =
   VITE_ENV?.VITE_API_URL
-  || (VITE_ENV?.DEV ? 'http://localhost:3000' : (typeof window !== 'undefined' && window.location?.origin) || DEFAULT_API_URL);
+  || (typeof window !== 'undefined' && window.location?.origin)
+  || DEFAULT_API_URL;
 
 interface FailedRequest {
   resolve: (value: unknown) => void;
