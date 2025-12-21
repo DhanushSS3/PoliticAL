@@ -1,7 +1,4 @@
 // src/config.js
-const BASE_URL =
-  process.env.NODE_ENV === "production"
-    ? "https://testing.careerredefine.com"
-    : "http://localhost:3000";
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://testing.careerredefine.com';
 
 export default BASE_URL;
