@@ -1,0 +1,17 @@
+{
+    "name": "politicai",
+    "version": "0.1.0",
+    "description": "Political Intelligence Platform v0",
+    "private": true,
+    "scripts": {
+        "prisma:validate": "prisma validate",
+        "prisma:generate": "prisma generate",
+        "prisma:studio": "prisma studio"
+    },
+    "devDependencies": {
+        "prisma": "^5.22.0"
+    },
+    "dependencies": {
+        "@prisma/client": "^5.22.0"
+    }
+}
