@@ -252,7 +252,6 @@ const RegisterSection: React.FC = () => {
                   value={formData.name}
                   onChange={handleChange}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="user name"
                 />
               </div>
             </div>
@@ -273,7 +272,6 @@ const RegisterSection: React.FC = () => {
                   value={formData.email}
                   onChange={handleChange}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="shannu@gmail.com"
                 />
               </div>
             </div>
@@ -295,7 +293,6 @@ const RegisterSection: React.FC = () => {
                   onChange={handleChange}
                   minLength={6}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="••••••••"
                 />
               </div>
             </div>
@@ -315,7 +312,6 @@ const RegisterSection: React.FC = () => {
                   required
                   value={formData.passwordConfirm}
                   onChange={handleChange}
-                  placeholder="Confirm Password"
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none transition duration-200"
                 />
               </div>
@@ -334,7 +330,6 @@ const RegisterSection: React.FC = () => {
                   type="tel"
                   value={formData.phone || ''}
                   onChange={handleChange}
-                  placeholder="+1234567890"
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
               </div>
