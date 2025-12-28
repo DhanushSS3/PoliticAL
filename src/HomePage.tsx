@@ -69,11 +69,12 @@ const HomePage = () => {
         </button>
       </div>
 
+      <AwardsSection />
+
       <PartnershipsSection />
       <TestimonialsSection />
       <StatisticsSection />
       <AboutSection />
-      <AwardsSection />
       <InsightsSection />
       <CallbackButton />
     </>
