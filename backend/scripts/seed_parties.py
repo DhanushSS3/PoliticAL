@@ -290,7 +290,7 @@ class PartySeeder:
 def main():
     """Entry point."""
     # Load DATABASE_URL from environment with fallback
-    db_url = os.getenv('DATABASE_URL_PG') or )
+    db_url = os.getenv('DATABASE_URL_PG') or os.getenv('DATABASE_URL')
     
     # Fallback to hardcoded value if environment variables not set
     if not db_url:

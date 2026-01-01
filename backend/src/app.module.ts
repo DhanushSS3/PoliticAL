@@ -1,0 +1,33 @@
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { PrismaModule } from "./prisma/prisma.module";
+import databaseConfig from "./config/database.config";
+import authConfig from "./config/auth.config";
+import appConfig from "./config/app.config";
+import { AuthModule } from "./modules/auth/auth.module";
+import { UsersModule } from "./modules/users/users.module";
+import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
+import { GeoModule } from "./modules/geo/geo.module";
+import { ElectionsModule } from "./modules/elections/elections.module";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { AdminModule } from "./modules/admin/admin.module";
+import { EmailModule } from "./modules/email/email.module";
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [databaseConfig, authConfig, appConfig],
+    }),
+    PrismaModule,
+    AuthModule,
+    UsersModule,
+    SubscriptionsModule,
+    GeoModule,
+    ElectionsModule,
+    AnalyticsModule,
+    AdminModule,
+    EmailModule,
+  ],
+})
+export class AppModule { }
