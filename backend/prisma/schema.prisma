@@ -598,5 +598,31 @@ model Job {
   errorLog  String?   @db.Text
 
   @@index([jobType, status]) // Job monitoring queries
+}
+
+// ============================================================================
+// KEYWORD MANAGEMENT (Industry Standard: Hybrid Approach)
+// ============================================================================
+
+/// Keywords for news fetching and filtering
+/// Managed by admins + auto-seeded from entities
+model NewsKeyword {
+  id          Int       @id @default(autoincrement())
+  keyword     String
+  entityType  EntityType   // GEO_UNIT, CANDIDATE, PARTY
+  entityId    Int
+  
+  isActive    Boolean   @default(true)
+  priority    Int       @default(1) // higher = more important
+  
+  // Future: query syntax/modifiers (e.g., "required", "exclude")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([entityType, entityId]) // Lookup keywords for specific entity
+  @@index([isActive])             // Filter active keywords
+  @@unique([entityType, entityId, keyword]) // Prevent duplicates
+}
   @@index([startedAt])       // Recent jobs
 }
