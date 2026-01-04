@@ -1,0 +1,151 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { KeywordManagerService } from './keyword-manager.service';
+import { EntityType, NewsIngestType, ModerationStatus } from '@prisma/client';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const Parser = require('rss-parser');
+
+@Injectable()
+export class NewsIngestionService {
+    private readonly logger = new Logger(NewsIngestionService.name);
+    private readonly parser = new Parser();
+    private readonly GOOGLE_NEWS_BASE_URL = 'https://news.google.com/rss/search?q=';
+
+    constructor(
+        private prisma: PrismaService,
+        private keywordManager: KeywordManagerService,
+    ) { }
+
+    /**
+     * Main job entry point: Fetch news for all active entities
+     * This should be scheduled via Cron
+     */
+    async fetchAllNews() {
+        this.logger.log('Starting Google News ingestion job...');
+        const jobStart = new Date();
+
+        // 1. Fetch Candidates
+        const candidates = await this.prisma.candidate.findMany({ select: { id: true } });
+        for (const c of candidates) {
+            await this.fetchNewsForEntity(EntityType.CANDIDATE, c.id);
+        }
+
+        // 2. Fetch GeoUnits (State level only for v1 to reduce noise, or specific focused units)
+        // For now, let's fetch limited GeoUnits to avoid rate limits
+        const geoUnits = await this.prisma.geoUnit.findMany({
+            where: { level: 'STATE' },
+            select: { id: true }
+        });
+        for (const g of geoUnits) {
+            await this.fetchNewsForEntity(EntityType.GEO_UNIT, g.id);
+        }
+
+        // 3. Fetch Parties
+        const parties = await this.prisma.party.findMany({ select: { id: true } });
+        for (const p of parties) {
+            await this.fetchNewsForEntity(EntityType.PARTY, p.id);
+        }
+
+        this.logger.log(`Ingestion job completed. Started at ${jobStart.toISOString()}`);
+    }
+
+    /**
+     * Fetch news for a specific entity using its keywords
+     */
+    async fetchNewsForEntity(entityType: EntityType, entityId: number) {
+        try {
+            // 1. Build Query
+            const query = await this.keywordManager.buildSearchQuery(entityType, entityId);
+            if (!query) {
+                // No keywords, skip
+                return;
+            }
+
+            this.logger.debug(`Fetching news for ${entityType} #${entityId} using query: ${query}`);
+
+            // 2. Fetch RSS Feed
+            const encodedQuery = encodeURIComponent(query + ' when:1d'); // Limit to last 24h
+            const feedUrl = `${this.GOOGLE_NEWS_BASE_URL}${encodedQuery}&hl=en-IN&gl=IN&ceid=IN:en`;
+
+            const feed = await this.parser.parseURL(feedUrl);
+
+            // 3. Process Items
+            for (const item of feed.items) {
+                await this.processFeedItem(item, entityType, entityId);
+            }
+
+        } catch (error) {
+            this.logger.error(`Failed to fetch news for ${entityType} #${entityId}: ${error.message}`);
+            // Continue to next entity, don't block
+        }
+    }
+
+    /**
+     * Normalize and save a single news item
+     */
+    private async processFeedItem(item: any, entityType: EntityType, entityId: number) {
+        try {
+            // Basic normalization
+            const title = item.title;
+            const link = item.link;
+            const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
+            const sourceName = item.source || 'Google News';
+            // Summary is often html in RSA, simple strip or take snippet
+            const summary = item.contentSnippet || item.content || item.title;
+
+            // 1. Deduplication Check
+            const existing = await this.prisma.newsArticle.findFirst({
+                where: { sourceUrl: link },
+            });
+
+            if (existing) {
+                // Link entity if not already linked
+                const existingLink = await this.prisma.newsEntityMention.findFirst({
+                    where: {
+                        articleId: existing.id,
+                        entityType,
+                        entityId,
+                    },
+                });
+
+                if (!existingLink) {
+                    await this.prisma.newsEntityMention.create({
+                        data: {
+                            articleId: existing.id,
+                            entityType,
+                            entityId,
+                        },
+                    });
+                }
+                return;
+            }
+
+            // 2. Create Article
+            const article = await this.prisma.newsArticle.create({
+                data: {
+                    title,
+                    summary,
+                    sourceName,
+                    sourceUrl: link,
+                    publishedAt: pubDate,
+                    ingestType: NewsIngestType.API,
+                    status: ModerationStatus.APPROVED, // v1 Rule: API news is auto-approved
+                },
+            });
+
+            // 3. Create Entity Link
+            await this.prisma.newsEntityMention.create({
+                data: {
+                    articleId: article.id,
+                    entityType,
+                    entityId,
+                },
+            });
+
+            this.logger.log(`Ingested article: "${title}" for ${entityType} #${entityId}`);
+
+        } catch (error) {
+            this.logger.warn(`Failed to save article "${item.title}": ${error.message}`);
+        }
+    }
+}

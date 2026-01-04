@@ -21,6 +21,7 @@ const elections_module_1 = require("./modules/elections/elections.module");
 const analytics_module_1 = require("./modules/analytics/analytics.module");
 const admin_module_1 = require("./modules/admin/admin.module");
 const email_module_1 = require("./modules/email/email.module");
+const news_module_1 = require("./modules/news/news.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -40,6 +41,7 @@ exports.AppModule = AppModule = __decorate([
             analytics_module_1.AnalyticsModule,
             admin_module_1.AdminModule,
             email_module_1.EmailModule,
+            news_module_1.NewsModule,
         ],
     })
 ], AppModule);

@@ -12,6 +12,7 @@ import { ElectionsModule } from "./modules/elections/elections.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { EmailModule } from "./modules/email/email.module";
+import { NewsModule } from "./modules/news/news.module";
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { EmailModule } from "./modules/email/email.module";
     AnalyticsModule,
     AdminModule,
     EmailModule,
+    NewsModule,
   ],
 })
 export class AppModule { }
