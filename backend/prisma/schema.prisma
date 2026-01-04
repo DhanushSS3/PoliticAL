@@ -598,6 +598,7 @@ model Job {
   errorLog  String?   @db.Text
 
   @@index([jobType, status]) // Job monitoring queries
+  @@index([startedAt])       // Recent jobs
 }
 
 // ============================================================================
@@ -623,6 +624,4 @@ model NewsKeyword {
   @@index([entityType, entityId]) // Lookup keywords for specific entity
   @@index([isActive])             // Filter active keywords
   @@unique([entityType, entityId, keyword]) // Prevent duplicates
-}
-  @@index([startedAt])       // Recent jobs
 }
