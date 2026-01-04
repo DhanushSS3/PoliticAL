@@ -8,8 +8,11 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NewsModule = void 0;
 const common_1 = require("@nestjs/common");
+const axios_1 = require("@nestjs/axios");
 const keyword_manager_service_1 = require("./services/keyword-manager.service");
 const news_ingestion_service_1 = require("./services/news-ingestion.service");
+const sentiment_analysis_service_1 = require("./services/sentiment-analysis.service");
+const file_parsing_service_1 = require("./services/file-parsing.service");
 const admin_news_controller_1 = require("./admin-news.controller");
 const auth_module_1 = require("../auth/auth.module");
 let NewsModule = class NewsModule {
@@ -17,15 +20,19 @@ let NewsModule = class NewsModule {
 exports.NewsModule = NewsModule;
 exports.NewsModule = NewsModule = __decorate([
     (0, common_1.Module)({
-        imports: [auth_module_1.AuthModule],
+        imports: [auth_module_1.AuthModule, axios_1.HttpModule],
         controllers: [admin_news_controller_1.AdminNewsController],
         providers: [
             keyword_manager_service_1.KeywordManagerService,
             news_ingestion_service_1.NewsIngestionService,
+            sentiment_analysis_service_1.SentimentAnalysisService,
+            file_parsing_service_1.FileParsingService,
         ],
         exports: [
             keyword_manager_service_1.KeywordManagerService,
             news_ingestion_service_1.NewsIngestionService,
+            sentiment_analysis_service_1.SentimentAnalysisService,
+            file_parsing_service_1.FileParsingService,
         ],
     })
 ], NewsModule);

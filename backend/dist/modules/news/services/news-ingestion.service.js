@@ -14,12 +14,14 @@ exports.NewsIngestionService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../../prisma/prisma.service");
 const keyword_manager_service_1 = require("./keyword-manager.service");
+const sentiment_analysis_service_1 = require("./sentiment-analysis.service");
 const client_1 = require("@prisma/client");
 const Parser = require('rss-parser');
 let NewsIngestionService = NewsIngestionService_1 = class NewsIngestionService {
-    constructor(prisma, keywordManager) {
+    constructor(prisma, keywordManager, sentimentService) {
         this.prisma = prisma;
         this.keywordManager = keywordManager;
+        this.sentimentService = sentimentService;
         this.logger = new common_1.Logger(NewsIngestionService_1.name);
         this.parser = new Parser();
         this.GOOGLE_NEWS_BASE_URL = 'https://news.google.com/rss/search?q=';
@@ -110,6 +112,10 @@ let NewsIngestionService = NewsIngestionService_1 = class NewsIngestionService {
                 },
             });
             this.logger.log(`Ingested article: "${title}" for ${entityType} #${entityId}`);
+            const contextGeoId = entityType === client_1.EntityType.GEO_UNIT ? entityId : undefined;
+            const fullText = `${title}. ${summary}`;
+            this.sentimentService.analyzeAndStoreSentiment(article.id, fullText, contextGeoId)
+                .catch(err => this.logger.error(`Sentiment trigger failed: ${err.message}`));
         }
         catch (error) {
             this.logger.warn(`Failed to save article "${item.title}": ${error.message}`);
@@ -120,6 +126,7 @@ exports.NewsIngestionService = NewsIngestionService;
 exports.NewsIngestionService = NewsIngestionService = NewsIngestionService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        keyword_manager_service_1.KeywordManagerService])
+        keyword_manager_service_1.KeywordManagerService,
+        sentiment_analysis_service_1.SentimentAnalysisService])
 ], NewsIngestionService);
 //# sourceMappingURL=news-ingestion.service.js.map

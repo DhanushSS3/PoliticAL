@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { KeywordManagerService } from './keyword-manager.service';
+import { SentimentAnalysisService } from './sentiment-analysis.service';
 import { EntityType, NewsIngestType, ModerationStatus } from '@prisma/client';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Parser = require('rss-parser');
@@ -14,6 +15,7 @@ export class NewsIngestionService {
     constructor(
         private prisma: PrismaService,
         private keywordManager: KeywordManagerService,
+        private sentimentService: SentimentAnalysisService,
     ) { }
 
     /**
@@ -30,8 +32,7 @@ export class NewsIngestionService {
             await this.fetchNewsForEntity(EntityType.CANDIDATE, c.id);
         }
 
-        // 2. Fetch GeoUnits (State level only for v1 to reduce noise, or specific focused units)
-        // For now, let's fetch limited GeoUnits to avoid rate limits
+        // 2. Fetch GeoUnits
         const geoUnits = await this.prisma.geoUnit.findMany({
             where: { level: 'STATE' },
             select: { id: true }
@@ -57,14 +58,13 @@ export class NewsIngestionService {
             // 1. Build Query
             const query = await this.keywordManager.buildSearchQuery(entityType, entityId);
             if (!query) {
-                // No keywords, skip
                 return;
             }
 
             this.logger.debug(`Fetching news for ${entityType} #${entityId} using query: ${query}`);
 
             // 2. Fetch RSS Feed
-            const encodedQuery = encodeURIComponent(query + ' when:1d'); // Limit to last 24h
+            const encodedQuery = encodeURIComponent(query + ' when:1d');
             const feedUrl = `${this.GOOGLE_NEWS_BASE_URL}${encodedQuery}&hl=en-IN&gl=IN&ceid=IN:en`;
 
             const feed = await this.parser.parseURL(feedUrl);
@@ -76,7 +76,6 @@ export class NewsIngestionService {
 
         } catch (error) {
             this.logger.error(`Failed to fetch news for ${entityType} #${entityId}: ${error.message}`);
-            // Continue to next entity, don't block
         }
     }
 
@@ -85,12 +84,10 @@ export class NewsIngestionService {
      */
     private async processFeedItem(item: any, entityType: EntityType, entityId: number) {
         try {
-            // Basic normalization
             const title = item.title;
             const link = item.link;
             const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
             const sourceName = item.source || 'Google News';
-            // Summary is often html in RSA, simple strip or take snippet
             const summary = item.contentSnippet || item.content || item.title;
 
             // 1. Deduplication Check
@@ -129,7 +126,7 @@ export class NewsIngestionService {
                     sourceUrl: link,
                     publishedAt: pubDate,
                     ingestType: NewsIngestType.API,
-                    status: ModerationStatus.APPROVED, // v1 Rule: API news is auto-approved
+                    status: ModerationStatus.APPROVED,
                 },
             });
 
@@ -143,6 +140,13 @@ export class NewsIngestionService {
             });
 
             this.logger.log(`Ingested article: "${title}" for ${entityType} #${entityId}`);
+
+            // 4. Trigger Sentiment Analysis (Non-blocking)
+            const contextGeoId = entityType === EntityType.GEO_UNIT ? entityId : undefined;
+            const fullText = `${title}. ${summary}`;
+
+            this.sentimentService.analyzeAndStoreSentiment(article.id, fullText, contextGeoId)
+                .catch(err => this.logger.error(`Sentiment trigger failed: ${err.message}`));
 
         } catch (error) {
             this.logger.warn(`Failed to save article "${item.title}": ${error.message}`);
