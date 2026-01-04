@@ -1,9 +1,11 @@
 import { AuthService } from './auth.service';
+import { PasswordService } from './password.service';
 import { LoginDto } from './dto';
 import { Request, Response } from 'express';
 export declare class AuthController {
     private readonly authService;
-    constructor(authService: AuthService);
+    private readonly passwordService;
+    constructor(authService: AuthService, passwordService: PasswordService);
     login(loginDto: LoginDto, req: Request, res: Response): Promise<{
         message: string;
         user: {
@@ -34,5 +36,14 @@ export declare class AuthController {
     refreshSession(req: any): Promise<{
         message: string;
         expiresIn: string;
+    }>;
+    changePassword(req: any, changePasswordDto: any): Promise<{
+        message: string;
+    }>;
+    forgotPassword(forgotPasswordDto: any): Promise<{
+        message: string;
+    }>;
+    resetPassword(resetPasswordDto: any): Promise<{
+        message: string;
     }>;
 }

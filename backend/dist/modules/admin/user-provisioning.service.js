@@ -13,24 +13,38 @@ exports.UserProvisioningService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const config_1 = require("@nestjs/config");
+const geo_hierarchy_service_1 = require("./geo-hierarchy.service");
 let UserProvisioningService = class UserProvisioningService {
-    constructor(prisma, configService) {
+    constructor(prisma, configService, geoHierarchyService) {
         this.prisma = prisma;
         this.configService = configService;
+        this.geoHierarchyService = geoHierarchyService;
     }
     async provisionUser(dto, createdByAdminId) {
-        var _a;
         if (dto.role === 'SUBSCRIBER' && !dto.subscription) {
             throw new common_1.BadRequestException('Subscription details required for SUBSCRIBER role');
         }
-        if (dto.subscription && dto.subscription.geoUnitIds.length === 0) {
-            throw new common_1.BadRequestException('At least one geo unit must be assigned');
-        }
-        if ((_a = dto.subscription) === null || _a === void 0 ? void 0 : _a.isTrial) {
-            const maxConstituencies = this.configService.get('TRIAL_MAX_CONSTITUENCIES', 3);
-            if (dto.subscription.geoUnitIds.length > maxConstituencies) {
-                throw new common_1.BadRequestException(`Trial users can access maximum ${maxConstituencies} constituencies`);
+        if (dto.subscription) {
+            if (!dto.subscription.geoUnitIds || dto.subscription.geoUnitIds.length === 0) {
+                throw new common_1.BadRequestException('At least one geo unit must be assigned');
             }
+            if (dto.subscription.durationDays === undefined) {
+                throw new common_1.BadRequestException('Subscription duration is required. Set durationDays (e.g., 30, 365) or null for lifetime');
+            }
+            await this.geoHierarchyService.validateGeoUnits(dto.subscription.geoUnitIds);
+            if (dto.subscription.isTrial) {
+                const maxConstituencies = this.configService.get('TRIAL_MAX_CONSTITUENCIES', 3);
+                if (dto.subscription.geoUnitIds.length > maxConstituencies) {
+                    throw new common_1.BadRequestException(`Trial users can select maximum ${maxConstituencies} geo units (children are auto-included)`);
+                }
+                if (dto.subscription.durationDays === null || dto.subscription.durationDays <= 0) {
+                    throw new common_1.BadRequestException('Trial subscriptions must have a valid expiry duration');
+                }
+            }
+        }
+        let expandedGeoUnitIds = [];
+        if (dto.subscription) {
+            expandedGeoUnitIds = await this.geoHierarchyService.expandGeoUnitsWithChildren(dto.subscription.geoUnitIds);
         }
         const subscriptionDates = this.calculateSubscriptionDates(dto.subscription);
         return this.prisma.$transaction(async (tx) => {
@@ -56,7 +70,7 @@ let UserProvisioningService = class UserProvisioningService {
                         createdByAdminId,
                     },
                 });
-                for (const geoUnitId of dto.subscription.geoUnitIds) {
+                for (const geoUnitId of expandedGeoUnitIds) {
                     await tx.geoAccess.create({
                         data: {
                             id: 0,
@@ -89,15 +103,15 @@ let UserProvisioningService = class UserProvisioningService {
         }
         const startsAt = new Date();
         let endsAt = null;
-        if (subscription.isTrial) {
-            const trialDays = subscription.durationDays ||
-                this.configService.get('TRIAL_DURATION_DAYS', 1);
-            endsAt = new Date();
-            endsAt.setDate(endsAt.getDate() + trialDays);
+        if (subscription.durationDays === null) {
+            endsAt = null;
         }
-        else if (subscription.durationDays) {
+        else if (subscription.durationDays > 0) {
             endsAt = new Date();
             endsAt.setDate(endsAt.getDate() + subscription.durationDays);
+        }
+        else {
+            throw new common_1.BadRequestException('Duration must be a positive number or null for lifetime');
         }
         return { startsAt, endsAt };
     }
@@ -108,18 +122,20 @@ let UserProvisioningService = class UserProvisioningService {
         if (!subscription) {
             throw new common_1.BadRequestException('User does not have a subscription');
         }
+        await this.geoHierarchyService.validateGeoUnits(geoUnitIds);
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         if (user.isTrial) {
             const maxConstituencies = this.configService.get('TRIAL_MAX_CONSTITUENCIES', 3);
             if (geoUnitIds.length > maxConstituencies) {
-                throw new common_1.BadRequestException(`Trial users can access maximum ${maxConstituencies} constituencies`);
+                throw new common_1.BadRequestException(`Trial users can select maximum ${maxConstituencies} geo units (children are auto-included)`);
             }
         }
+        const expandedGeoUnitIds = await this.geoHierarchyService.expandGeoUnitsWithChildren(geoUnitIds);
         return this.prisma.$transaction(async (tx) => {
             await tx.geoAccess.deleteMany({
                 where: { subscriptionId: subscription.id },
             });
-            for (const geoUnitId of geoUnitIds) {
+            for (const geoUnitId of expandedGeoUnitIds) {
                 await tx.geoAccess.create({
                     data: {
                         id: 0,
@@ -177,6 +193,7 @@ exports.UserProvisioningService = UserProvisioningService;
 exports.UserProvisioningService = UserProvisioningService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        config_1.ConfigService])
+        config_1.ConfigService,
+        geo_hierarchy_service_1.GeoHierarchyService])
 ], UserProvisioningService);
 //# sourceMappingURL=user-provisioning.service.js.map

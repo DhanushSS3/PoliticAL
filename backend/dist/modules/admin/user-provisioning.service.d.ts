@@ -1,10 +1,12 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { CreateUserDto } from '../auth/dto';
+import { GeoHierarchyService } from './geo-hierarchy.service';
 export declare class UserProvisioningService {
     private prisma;
     private configService;
-    constructor(prisma: PrismaService, configService: ConfigService);
+    private geoHierarchyService;
+    constructor(prisma: PrismaService, configService: ConfigService, geoHierarchyService: GeoHierarchyService);
     provisionUser(dto: CreateUserDto, createdByAdminId: number): Promise<{
         subscription: {
             access: ({

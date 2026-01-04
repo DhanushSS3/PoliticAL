@@ -6,7 +6,7 @@ export declare class CreateUserDto {
     role: 'ADMIN' | 'SUBSCRIBER';
     subscription?: {
         isTrial: boolean;
-        durationDays?: number;
+        durationDays: number | null;
         geoUnitIds: number[];
     };
 }

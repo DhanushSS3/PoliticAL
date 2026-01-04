@@ -11,19 +11,24 @@ const common_1 = require("@nestjs/common");
 const auth_service_1 = require("./auth.service");
 const auth_controller_1 = require("./auth.controller");
 const impersonation_service_1 = require("./impersonation.service");
+const password_service_1 = require("./password.service");
+const otp_service_1 = require("./otp.service");
 const session_guard_1 = require("./guards/session.guard");
 const impersonation_guard_1 = require("./guards/impersonation.guard");
 const roles_guard_1 = require("./guards/roles.guard");
 const users_module_1 = require("../users/users.module");
+const email_module_1 = require("../email/email.module");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
 exports.AuthModule = AuthModule = __decorate([
     (0, common_1.Module)({
-        imports: [users_module_1.UsersModule],
+        imports: [users_module_1.UsersModule, email_module_1.EmailModule],
         providers: [
             auth_service_1.AuthService,
             impersonation_service_1.ImpersonationService,
+            password_service_1.PasswordService,
+            otp_service_1.OtpService,
             session_guard_1.SessionGuard,
             impersonation_guard_1.ImpersonationGuard,
             roles_guard_1.RolesGuard
@@ -32,6 +37,8 @@ exports.AuthModule = AuthModule = __decorate([
         exports: [
             auth_service_1.AuthService,
             impersonation_service_1.ImpersonationService,
+            password_service_1.PasswordService,
+            otp_service_1.OtpService,
             session_guard_1.SessionGuard,
             impersonation_guard_1.ImpersonationGuard,
             roles_guard_1.RolesGuard

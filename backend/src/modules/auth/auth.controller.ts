@@ -1,12 +1,16 @@
 import { Controller, Post, Get, Body, Req, Res, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { PasswordService } from './password.service';
 import { LoginDto } from './dto';
 import { Request, Response } from 'express';
 import { SessionGuard } from './guards/session.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly passwordService: PasswordService
+  ) { }
 
   /**
    * Login with email/phone + password
@@ -105,6 +109,44 @@ export class AuthController {
     return {
       message: 'Session refreshed',
       expiresIn: '9 days',
+    };
+  }
+
+  /**
+   * Change password (requires current password)
+   */
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(SessionGuard)
+  async changePassword(@Req() req: any, @Body() changePasswordDto: any) {
+    const userId = req.user.id;
+    await this.passwordService.changePassword(userId, changePasswordDto);
+
+    return {
+      message: 'Password changed successfully. Please login again with your new password.',
+    };
+  }
+
+  /**
+   * Forgot password - Send OTP to email
+   */
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() forgotPasswordDto: any) {
+    const result = await this.passwordService.forgotPassword(forgotPasswordDto);
+    return result;
+  }
+
+  /**
+   * Reset password with OTP
+   */
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() resetPasswordDto: any) {
+    await this.passwordService.resetPassword(resetPasswordDto);
+
+    return {
+      message: 'Password reset successfully. You can now login with your new password.',
     };
   }
 }

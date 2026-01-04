@@ -167,6 +167,257 @@ let EmailService = EmailService_1 = class EmailService {
             return false;
         }
     }
+    async sendPasswordResetOtp(email, fullName, otp) {
+        if (!this.transporter) {
+            this.logger.warn('Email not sent: SMTP not configured');
+            return;
+        }
+        const fromEmail = this.configService.get('FROM_EMAIL') || 'noreply@politicai.com';
+        const fromName = this.configService.get('FROM_NAME') || 'PoliticAI Platform';
+        const subject = 'Password Reset OTP - PoliticAI';
+        const html = this.getPasswordResetOtpTemplate(fullName, otp);
+        try {
+            await this.transporter.sendMail({
+                from: `"${fromName}" <${fromEmail}>`,
+                to: email,
+                subject,
+                html,
+            });
+            this.logger.log(`Password reset OTP sent to ${email}`);
+        }
+        catch (error) {
+            this.logger.error(`Failed to send OTP email to ${email}:`, error);
+        }
+    }
+    async sendPasswordChangedEmail(email, fullName) {
+        if (!this.transporter) {
+            this.logger.warn('Email not sent: SMTP not configured');
+            return;
+        }
+        const fromEmail = this.configService.get('FROM_EMAIL') || 'noreply@politicai.com';
+        const fromName = this.configService.get('FROM_NAME') || 'PoliticAI Platform';
+        const subject = 'Password Changed - PoliticAI';
+        const html = this.getPasswordChangedTemplate(fullName);
+        try {
+            await this.transporter.sendMail({
+                from: `"${fromName}" <${fromEmail}>`,
+                to: email,
+                subject,
+                html,
+            });
+            this.logger.log(`Password changed notification sent to ${email}`);
+        }
+        catch (error) {
+            this.logger.error(`Failed to send password changed email to ${email}:`, error);
+        }
+    }
+    async sendPasswordResetConfirmation(email, fullName) {
+        if (!this.transporter) {
+            this.logger.warn('Email not sent: SMTP not configured');
+            return;
+        }
+        const fromEmail = this.configService.get('FROM_EMAIL') || 'noreply@politicai.com';
+        const fromName = this.configService.get('FROM_NAME') || 'PoliticAI Platform';
+        const subject = 'Password Reset Successful - PoliticAI';
+        const html = this.getPasswordResetConfirmationTemplate(fullName);
+        try {
+            await this.transporter.sendMail({
+                from: `"${fromName}" <${fromEmail}>`,
+                to: email,
+                subject,
+                html,
+            });
+            this.logger.log(`Password reset confirmation sent to ${email}`);
+        }
+        catch (error) {
+            this.logger.error(`Failed to send password reset confirmation to ${email}:`, error);
+        }
+    }
+    getPasswordResetOtpTemplate(fullName, otp) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Reset OTP</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; border-radius: 8px 8px 0 0; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">Password Reset</h1>
+            </td>
+          </tr>
+          
+          <!-- Body -->
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Hello <strong>${fullName}</strong>,
+              </p>
+              
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                We received a request to reset your password. Use the OTP below to reset your password:
+              </p>
+              
+              <!-- OTP Box -->
+              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; padding: 30px; margin: 30px 0; text-align: center;">
+                <p style="margin: 0 0 10px; color: #e0e7ff; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your OTP</p>
+                <p style="margin: 0; color: #ffffff; font-size: 48px; font-weight: 700; letter-spacing: 8px; font-family: 'Courier New', monospace;">${otp}</p>
+              </div>
+              
+              <!-- Warning -->
+              <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 24px 0; border-radius: 4px;">
+                <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.6;">
+                  <strong>⚠️ Important:</strong><br>
+                  • This OTP is valid for <strong>10 minutes</strong><br>
+                  • Do not share this OTP with anyone<br>
+                  • If you didn't request this, please ignore this email
+                </p>
+              </div>
+              
+              <p style="margin: 24px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                If you have any questions, please contact your administrator.
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #6b7280; font-size: 12px; text-align: center; line-height: 1.6;">
+                © ${new Date().getFullYear()} PoliticAI Platform. All rights reserved.<br>
+                This is an automated message, please do not reply to this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+    }
+    getPasswordChangedTemplate(fullName) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Changed</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px; border-radius: 8px 8px 0 0; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">✓ Password Changed</h1>
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Hello <strong>${fullName}</strong>,
+              </p>
+              
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Your password has been successfully changed.
+              </p>
+              
+              <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 24px 0; border-radius: 4px;">
+                <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.6;">
+                  <strong>⚠️ Security Alert:</strong><br>
+                  If you did not make this change, please contact your administrator immediately.
+                </p>
+              </div>
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #6b7280; font-size: 12px; text-align: center; line-height: 1.6;">
+                © ${new Date().getFullYear()} PoliticAI Platform. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+    }
+    getPasswordResetConfirmationTemplate(fullName) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Reset Successful</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px; border-radius: 8px 8px 0 0; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">✓ Password Reset Successful</h1>
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Hello <strong>${fullName}</strong>,
+              </p>
+              
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Your password has been successfully reset. You can now login with your new password.
+              </p>
+              
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="https://app.politicai.com/login" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                  Login to PoliticAI
+                </a>
+              </div>
+              
+              <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 24px 0; border-radius: 4px;">
+                <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.6;">
+                  <strong>⚠️ Security Alert:</strong><br>
+                  If you did not reset your password, please contact your administrator immediately.
+                </p>
+              </div>
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #6b7280; font-size: 12px; text-align: center; line-height: 1.6;">
+                © ${new Date().getFullYear()} PoliticAI Platform. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+    }
 };
 exports.EmailService = EmailService;
 exports.EmailService = EmailService = EmailService_1 = __decorate([

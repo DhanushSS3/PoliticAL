@@ -3,14 +3,24 @@ export class CreateUserDto {
     fullName: string;
     email?: string;
     phone: string;
-    password?: string; // Optional: auto-generate if not provided
+    password?: string; // Optional: auto-generate if not provided (industry standard)
     role: 'ADMIN' | 'SUBSCRIBER';
 
-    // Subscription Details (optional for ADMIN, required for SUBSCRIBER)
+    // Subscription Details (REQUIRED for SUBSCRIBER)
     subscription?: {
         isTrial: boolean;
-        durationDays?: number; // If not provided, uses TRIAL_DURATION_DAYS or null (lifetime)
-        geoUnitIds: number[]; // Required: which constituencies/districts user can access
+
+        // Duration is REQUIRED (admin must explicitly set expiry)
+        // - For trial: typically 1-30 days
+        // - For paid: 30, 90, 180, 365 days or custom
+        // - For lifetime: set to 36500 (100 years) or use null
+        durationDays: number | null; // null = lifetime, number = specific days
+
+        // Geo access (REQUIRED)
+        // Parent geo units automatically include all children
+        // Example: If you grant access to "Karnataka" (STATE), 
+        //          user gets access to all districts and constituencies in Karnataka
+        geoUnitIds: number[];
     };
 }
 
