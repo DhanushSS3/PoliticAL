@@ -10,3 +10,4 @@ class SentimentResponse(BaseModel):
     score: float
     confidence: float
     model_version: str
+    language: str = "unknown"
