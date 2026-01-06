@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { KeywordManagerService } from './keyword-manager.service';
 import { SentimentAnalysisService } from './sentiment-analysis.service';
@@ -22,6 +23,7 @@ export class NewsIngestionService {
      * Main job entry point: Fetch news for all active entities
      * This should be scheduled via Cron
      */
+    @Cron(CronExpression.EVERY_HOUR)
     async fetchAllNews() {
         this.logger.log('Starting Google News ingestion job...');
         const jobStart = new Date();

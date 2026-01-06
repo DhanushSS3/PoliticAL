@@ -12,6 +12,7 @@ var NewsIngestionService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NewsIngestionService = void 0;
 const common_1 = require("@nestjs/common");
+const schedule_1 = require("@nestjs/schedule");
 const prisma_service_1 = require("../../../prisma/prisma.service");
 const keyword_manager_service_1 = require("./keyword-manager.service");
 const sentiment_analysis_service_1 = require("./sentiment-analysis.service");
@@ -123,6 +124,12 @@ let NewsIngestionService = NewsIngestionService_1 = class NewsIngestionService {
     }
 };
 exports.NewsIngestionService = NewsIngestionService;
+__decorate([
+    (0, schedule_1.Cron)(schedule_1.CronExpression.EVERY_HOUR),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], NewsIngestionService.prototype, "fetchAllNews", null);
 exports.NewsIngestionService = NewsIngestionService = NewsIngestionService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,

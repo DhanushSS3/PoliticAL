@@ -11,3 +11,7 @@ class SentimentResponse(BaseModel):
     confidence: float
     model_version: str
     language: str = "unknown"
+    
+    model_config = {
+        "protected_namespaces": ()
+    }

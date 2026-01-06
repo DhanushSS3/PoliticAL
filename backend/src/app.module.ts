@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { PrismaModule } from "./prisma/prisma.module";
 import databaseConfig from "./config/database.config";
 import authConfig from "./config/auth.config";
@@ -20,6 +21,7 @@ import { NewsModule } from "./modules/news/news.module";
       isGlobal: true,
       load: [databaseConfig, authConfig, appConfig],
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -33,3 +35,4 @@ import { NewsModule } from "./modules/news/news.module";
   ],
 })
 export class AppModule { }
+

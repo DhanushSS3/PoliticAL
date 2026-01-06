@@ -25,8 +25,10 @@
         "@nestjs/config": "^3.1.1",
         "@nestjs/core": "^10.0.0",
         "@nestjs/platform-express": "^10.0.0",
+        "@nestjs/schedule": "^6.1.0",
         "@prisma/client": "^5.22.0",
         "@types/cookie-parser": "^1.4.10",
+        "@types/cron": "^2.0.1",
         "@types/multer": "^2.0.0",
         "@types/nodemailer": "^7.0.4",
         "axios": "^1.13.2",
@@ -37,6 +39,7 @@
         "form-data": "^4.0.5",
         "nodemailer": "^7.0.12",
         "reflect-metadata": "^0.1.13",
+        "rss-parser": "^3.13.0",
         "rxjs": "^7.8.1"
     },
     "devDependencies": {

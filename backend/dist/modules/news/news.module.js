@@ -13,7 +13,9 @@ const keyword_manager_service_1 = require("./services/keyword-manager.service");
 const news_ingestion_service_1 = require("./services/news-ingestion.service");
 const sentiment_analysis_service_1 = require("./services/sentiment-analysis.service");
 const file_parsing_service_1 = require("./services/file-parsing.service");
+const news_service_1 = require("./services/news.service");
 const admin_news_controller_1 = require("./admin-news.controller");
+const news_controller_1 = require("./news.controller");
 const auth_module_1 = require("../auth/auth.module");
 let NewsModule = class NewsModule {
 };
@@ -21,18 +23,20 @@ exports.NewsModule = NewsModule;
 exports.NewsModule = NewsModule = __decorate([
     (0, common_1.Module)({
         imports: [auth_module_1.AuthModule, axios_1.HttpModule],
-        controllers: [admin_news_controller_1.AdminNewsController],
+        controllers: [admin_news_controller_1.AdminNewsController, news_controller_1.NewsController],
         providers: [
             keyword_manager_service_1.KeywordManagerService,
             news_ingestion_service_1.NewsIngestionService,
             sentiment_analysis_service_1.SentimentAnalysisService,
             file_parsing_service_1.FileParsingService,
+            news_service_1.NewsService,
         ],
         exports: [
             keyword_manager_service_1.KeywordManagerService,
             news_ingestion_service_1.NewsIngestionService,
             sentiment_analysis_service_1.SentimentAnalysisService,
             file_parsing_service_1.FileParsingService,
+            news_service_1.NewsService,
         ],
     })
 ], NewsModule);

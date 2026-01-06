@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
+const schedule_1 = require("@nestjs/schedule");
 const prisma_module_1 = require("./prisma/prisma.module");
 const database_config_1 = require("./config/database.config");
 const auth_config_1 = require("./config/auth.config");
@@ -32,6 +33,7 @@ exports.AppModule = AppModule = __decorate([
                 isGlobal: true,
                 load: [database_config_1.default, auth_config_1.default, app_config_1.default],
             }),
+            schedule_1.ScheduleModule.forRoot(),
             prisma_module_1.PrismaModule,
             auth_module_1.AuthModule,
             users_module_1.UsersModule,

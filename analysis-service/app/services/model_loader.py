@@ -23,11 +23,14 @@ class SentimentModel:
         if SentimentModel._model is not None:
             return
             
+
         logger.info(f"Loading sentiment model: {self.MODEL_NAME}...")
+        print(f"INFO:    Downloading/Loading sentiment model: {self.MODEL_NAME}. This may take several minutes on the first run...")
         try:
             SentimentModel._tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
             SentimentModel._model = AutoModelForSequenceClassification.from_pretrained(self.MODEL_NAME)
             logger.info("Sentiment model loaded successfully.")
+            print("INFO:    Sentiment model loaded successfully.")
         except Exception as e:
             logger.error(f"Failed to load sentiment model: {e}")
             raise e
@@ -52,4 +55,3 @@ class SentimentModel:
             
         return probs[0].tolist()
 
-sentiment_model = SentimentModel()
