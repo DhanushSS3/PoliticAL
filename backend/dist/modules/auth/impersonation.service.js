@@ -15,7 +15,7 @@ const prisma_service_1 = require("../../prisma/prisma.service");
 let ImpersonationService = class ImpersonationService {
     constructor(prisma) {
         this.prisma = prisma;
-        this.IMPERSONATION_DURATION_HOURS = parseInt(process.env.IMPERSONATION_DURATION_HOURS || '4');
+        this.IMPERSONATION_DURATION_HOURS = parseInt(process.env.IMPERSONATION_DURATION_HOURS || "4");
     }
     async startImpersonation(adminId, dto, deviceInfo, ipAddress) {
         const expiresAt = new Date();
@@ -27,30 +27,30 @@ let ImpersonationService = class ImpersonationService {
                 reason: dto.reason,
                 deviceInfo,
                 ipAddress,
-                expiresAt
-            }
+                expiresAt,
+            },
         });
         return session.id;
     }
-    async stopImpersonation(impersonationToken, reason = 'EXPLICIT_STOP') {
+    async stopImpersonation(impersonationToken, reason = "EXPLICIT_STOP") {
         await this.prisma.impersonationSession.update({
             where: { id: impersonationToken },
             data: {
                 endedAt: new Date(),
-                endReason: reason
-            }
+                endReason: reason,
+            },
         });
     }
     async endAllImpersonationsForAdmin(adminId) {
         await this.prisma.impersonationSession.updateMany({
             where: {
                 adminId,
-                endedAt: null
+                endedAt: null,
             },
             data: {
                 endedAt: new Date(),
-                endReason: 'ADMIN_LOGOUT'
-            }
+                endReason: "ADMIN_LOGOUT",
+            },
         });
     }
     async validateImpersonation(impersonationToken) {
@@ -64,14 +64,14 @@ let ImpersonationService = class ImpersonationService {
                             include: {
                                 access: {
                                     include: {
-                                        geoUnit: true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                                        geoUnit: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
         });
         if (!session) {
             return null;
@@ -81,7 +81,7 @@ let ImpersonationService = class ImpersonationService {
         }
         const now = new Date();
         if (session.expiresAt < now) {
-            await this.stopImpersonation(impersonationToken, 'EXPIRED');
+            await this.stopImpersonation(impersonationToken, "EXPIRED");
             return null;
         }
         if (!session.admin.isActive) {
@@ -101,21 +101,21 @@ let ImpersonationService = class ImpersonationService {
                         id: true,
                         fullName: true,
                         email: true,
-                        phone: true
-                    }
+                        phone: true,
+                    },
                 },
                 targetUser: {
                     select: {
                         id: true,
                         fullName: true,
                         email: true,
-                        phone: true
-                    }
-                }
+                        phone: true,
+                    },
+                },
             },
             orderBy: {
-                createdAt: 'desc'
-            }
+                createdAt: "desc",
+            },
         });
     }
     async getImpersonationHistory(adminId, limit = 100) {
@@ -127,22 +127,22 @@ let ImpersonationService = class ImpersonationService {
                         id: true,
                         fullName: true,
                         email: true,
-                        phone: true
-                    }
+                        phone: true,
+                    },
                 },
                 targetUser: {
                     select: {
                         id: true,
                         fullName: true,
                         email: true,
-                        phone: true
-                    }
-                }
+                        phone: true,
+                    },
+                },
             },
             orderBy: {
-                createdAt: 'desc'
+                createdAt: "desc",
             },
-            take: limit
+            take: limit,
         });
     }
 };

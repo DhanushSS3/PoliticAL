@@ -14,7 +14,7 @@ const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
 class ManualNewsIngestionDto {
     constructor() {
-        this.title = 'Manual Entry';
+        this.title = "Manual Entry";
     }
 }
 exports.ManualNewsIngestionDto = ManualNewsIngestionDto;

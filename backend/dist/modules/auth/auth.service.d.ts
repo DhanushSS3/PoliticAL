@@ -1,6 +1,6 @@
-import { PrismaService } from '../../prisma/prisma.service';
-import { LoginDto, CreateSessionDto } from './dto';
-import { User, Session } from '@prisma/client';
+import { PrismaService } from "../../prisma/prisma.service";
+import { LoginDto, CreateSessionDto } from "./dto";
+import { User, Session } from "@prisma/client";
 export declare class AuthService {
     private prisma;
     constructor(prisma: PrismaService);
@@ -16,7 +16,7 @@ export declare class AuthService {
     validateSession(sessionToken: string): Promise<User | null>;
     logout(sessionToken: string): Promise<void>;
     invalidateAllUserSessions(userId: number): Promise<void>;
-    createUserWithPassword(fullName: string, email: string | undefined, phone: string, password: string | undefined, role: 'ADMIN' | 'SUBSCRIBER', isTrial: boolean): Promise<{
+    createUserWithPassword(fullName: string, email: string | undefined, phone: string, password: string | undefined, role: "ADMIN" | "SUBSCRIBER", isTrial: boolean): Promise<{
         user: any;
         tempPassword: string;
     }>;

@@ -24,17 +24,17 @@ let AuthController = class AuthController {
         this.passwordService = passwordService;
     }
     async login(loginDto, req, res) {
-        const deviceInfo = req.headers['user-agent'];
+        const deviceInfo = req.headers["user-agent"];
         const ipAddress = req.ip || req.socket.remoteAddress;
         const { user, sessionToken } = await this.authService.login(loginDto, deviceInfo, ipAddress);
-        res.cookie('sessionToken', sessionToken, {
+        res.cookie("sessionToken", sessionToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
             maxAge: 9 * 24 * 60 * 60 * 1000,
         });
         return {
-            message: 'Login successful',
+            message: "Login successful",
             user: {
                 id: user.id,
                 fullName: user.fullName,
@@ -50,9 +50,9 @@ let AuthController = class AuthController {
         if (sessionToken) {
             await this.authService.logout(sessionToken);
         }
-        res.clearCookie('sessionToken');
+        res.clearCookie("sessionToken");
         return {
-            message: 'Logout successful',
+            message: "Logout successful",
         };
     }
     async getCurrentUser(req) {
@@ -73,15 +73,15 @@ let AuthController = class AuthController {
     }
     async refreshSession(req) {
         return {
-            message: 'Session refreshed',
-            expiresIn: '9 days',
+            message: "Session refreshed",
+            expiresIn: "9 days",
         };
     }
     async changePassword(req, changePasswordDto) {
         const userId = req.user.id;
         await this.passwordService.changePassword(userId, changePasswordDto);
         return {
-            message: 'Password changed successfully. Please login again with your new password.',
+            message: "Password changed successfully. Please login again with your new password.",
         };
     }
     async forgotPassword(forgotPasswordDto) {
@@ -91,13 +91,13 @@ let AuthController = class AuthController {
     async resetPassword(resetPasswordDto) {
         await this.passwordService.resetPassword(resetPasswordDto);
         return {
-            message: 'Password reset successfully. You can now login with your new password.',
+            message: "Password reset successfully. You can now login with your new password.",
         };
     }
 };
 exports.AuthController = AuthController;
 __decorate([
-    (0, common_1.Post)('login'),
+    (0, common_1.Post)("login"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Req)()),
@@ -107,7 +107,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
 __decorate([
-    (0, common_1.Post)('logout'),
+    (0, common_1.Post)("logout"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, common_1.UseGuards)(session_guard_1.SessionGuard),
     __param(0, (0, common_1.Req)()),
@@ -117,7 +117,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "logout", null);
 __decorate([
-    (0, common_1.Get)('me'),
+    (0, common_1.Get)("me"),
     (0, common_1.UseGuards)(session_guard_1.SessionGuard),
     __param(0, (0, common_1.Req)()),
     __metadata("design:type", Function),
@@ -125,7 +125,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "getCurrentUser", null);
 __decorate([
-    (0, common_1.Post)('refresh'),
+    (0, common_1.Post)("refresh"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, common_1.UseGuards)(session_guard_1.SessionGuard),
     __param(0, (0, common_1.Req)()),
@@ -134,7 +134,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "refreshSession", null);
 __decorate([
-    (0, common_1.Post)('change-password'),
+    (0, common_1.Post)("change-password"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, common_1.UseGuards)(session_guard_1.SessionGuard),
     __param(0, (0, common_1.Req)()),
@@ -144,7 +144,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "changePassword", null);
 __decorate([
-    (0, common_1.Post)('forgot-password'),
+    (0, common_1.Post)("forgot-password"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -152,7 +152,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "forgotPassword", null);
 __decorate([
-    (0, common_1.Post)('reset-password'),
+    (0, common_1.Post)("reset-password"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -160,7 +160,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "resetPassword", null);
 exports.AuthController = AuthController = __decorate([
-    (0, common_1.Controller)('auth'),
+    (0, common_1.Controller)("auth"),
     __metadata("design:paramtypes", [auth_service_1.AuthService,
         password_service_1.PasswordService])
 ], AuthController);

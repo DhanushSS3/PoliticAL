@@ -15,53 +15,63 @@ const common_1 = require("@nestjs/common");
 const axios_1 = require("@nestjs/axios");
 const config_1 = require("@nestjs/config");
 const prisma_service_1 = require("../../../prisma/prisma.service");
+const geo_attribution_resolver_service_1 = require("./geo-attribution-resolver.service");
+const relevance_calculator_service_1 = require("../../analytics/services/relevance-calculator.service");
 const rxjs_1 = require("rxjs");
 const client_1 = require("@prisma/client");
 let SentimentAnalysisService = SentimentAnalysisService_1 = class SentimentAnalysisService {
-    constructor(httpService, configService, prisma) {
+    constructor(httpService, configService, prisma, geoResolver, relevanceCalculator) {
         this.httpService = httpService;
         this.configService = configService;
         this.prisma = prisma;
+        this.geoResolver = geoResolver;
+        this.relevanceCalculator = relevanceCalculator;
         this.logger = new common_1.Logger(SentimentAnalysisService_1.name);
-        this.analysisServiceUrl = this.configService.get('ANALYSIS_SERVICE_URL') || 'http://localhost:8000';
+        this.analysisServiceUrl =
+            this.configService.get("ANALYSIS_SERVICE_URL") ||
+                "http://localhost:8000";
     }
-    async analyzeAndStoreSentiment(articleId, content, geoUnitId) {
+    async analyzeAndStoreSentiment(articleId, content, explicitGeoUnitId) {
         try {
             this.logger.debug(`Requesting sentiment analysis for article #${articleId}`);
             const { data } = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.analysisServiceUrl}/analyze/sentiment`, {
                 content,
-                language: 'auto',
-                context: 'political_news'
+                language: "auto",
+                context: "political_news",
             }));
             this.logger.debug(`Received sentiment: ${data.label} (${data.score})`);
-            let targetGeoUnitIds = [];
-            if (geoUnitId) {
-                targetGeoUnitIds.push(geoUnitId);
+            let resolutions = [];
+            if (explicitGeoUnitId) {
+                resolutions.push({
+                    geoUnitId: explicitGeoUnitId,
+                });
+                this.logger.debug(`Using explicit geoUnitId: ${explicitGeoUnitId}`);
             }
             else {
-                const links = await this.prisma.newsEntityMention.findMany({
-                    where: { articleId, entityType: 'GEO_UNIT' },
-                });
-                targetGeoUnitIds = links.map(l => l.entityId);
+                resolutions = await this.geoResolver.resolveGeoUnits(articleId);
             }
-            if (targetGeoUnitIds.length === 0) {
-                this.logger.warn(`No GeoUnit linked for article #${articleId}, skipping sentiment storage.`);
+            if (resolutions.length === 0) {
+                this.logger.warn(`Could not resolve any GeoUnit for article #${articleId}. Sentiment will not be stored.`);
                 return;
             }
-            for (const gid of targetGeoUnitIds) {
+            for (const res of resolutions) {
+                const relevanceWeight = this.relevanceCalculator.getBaseWeight(res.sourceEntityType || null);
                 await this.prisma.sentimentSignal.create({
                     data: {
-                        geoUnitId: gid,
+                        geoUnitId: res.geoUnitId,
                         sourceType: client_1.DataSourceType.NEWS,
                         sourceRefId: articleId,
                         sentiment: data.label,
                         sentimentScore: data.score,
                         confidence: data.confidence,
                         modelVersion: data.model_version,
+                        relevanceWeight,
+                        sourceEntityType: res.sourceEntityType,
+                        sourceEntityId: res.sourceEntityId,
                     },
                 });
             }
-            this.logger.log(`Sentiment stored for article #${articleId}`);
+            this.logger.log(`✅ Sentiment stored for article #${articleId} across ${resolutions.length} GeoUnit(s)`);
         }
         catch (error) {
             this.logger.error(`Sentiment analysis failed for article #${articleId}: ${error.message}`);
@@ -73,6 +83,8 @@ exports.SentimentAnalysisService = SentimentAnalysisService = SentimentAnalysisS
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [axios_1.HttpService,
         config_1.ConfigService,
-        prisma_service_1.PrismaService])
+        prisma_service_1.PrismaService,
+        geo_attribution_resolver_service_1.GeoAttributionResolverService,
+        relevance_calculator_service_1.RelevanceCalculatorService])
 ], SentimentAnalysisService);
 //# sourceMappingURL=sentiment-analysis.service.js.map

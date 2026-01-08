@@ -1,7 +1,7 @@
-import { AuthService } from './auth.service';
-import { PasswordService } from './password.service';
-import { LoginDto } from './dto';
-import { Request, Response } from 'express';
+import { AuthService } from "./auth.service";
+import { PasswordService } from "./password.service";
+import { LoginDto } from "./dto";
+import { Request, Response } from "express";
 export declare class AuthController {
     private readonly authService;
     private readonly passwordService;

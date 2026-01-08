@@ -1,4 +1,4 @@
-import { EntityType, SentimentLabel } from '@prisma/client';
+import { EntityType, SentimentLabel } from "@prisma/client";
 export declare class GetNewsFeedDto {
     page?: number;
     limit?: number;

@@ -34,7 +34,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], NewsController.prototype, "getFeed", null);
 exports.NewsController = NewsController = __decorate([
-    (0, common_1.Controller)('news'),
+    (0, common_1.Controller)("news"),
     (0, common_1.UseGuards)(session_guard_1.SessionGuard),
     __metadata("design:paramtypes", [news_service_1.NewsService])
 ], NewsController);

@@ -1,5 +1,5 @@
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateSubscriptionDto, GrantGeoAccessDto } from './dto';
+import { PrismaService } from "../../prisma/prisma.service";
+import { CreateSubscriptionDto, GrantGeoAccessDto } from "./dto";
 export declare class AdminService {
     private prisma;
     constructor(prisma: PrismaService);

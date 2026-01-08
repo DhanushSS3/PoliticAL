@@ -20,11 +20,11 @@ let ImpersonationGuard = class ImpersonationGuard {
         const request = context.switchToHttp().getRequest();
         const impersonationToken = this.extractImpersonationToken(request);
         if (!impersonationToken) {
-            throw new common_1.UnauthorizedException('No impersonation token provided');
+            throw new common_1.UnauthorizedException("No impersonation token provided");
         }
         const session = await this.impersonationService.validateImpersonation(impersonationToken);
         if (!session) {
-            throw new common_1.UnauthorizedException('Invalid or expired impersonation session');
+            throw new common_1.UnauthorizedException("Invalid or expired impersonation session");
         }
         request.admin = session.admin;
         request.user = session.targetUser;
@@ -36,7 +36,7 @@ let ImpersonationGuard = class ImpersonationGuard {
         if (request.cookies && request.cookies.impersonationToken) {
             return request.cookies.impersonationToken;
         }
-        const impersonationHeader = request.headers['x-impersonation-token'];
+        const impersonationHeader = request.headers["x-impersonation-token"];
         if (impersonationHeader) {
             return impersonationHeader;
         }

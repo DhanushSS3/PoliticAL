@@ -1,7 +1,7 @@
-import { PrismaService } from '../../../prisma/prisma.service';
-import { KeywordManagerService } from './keyword-manager.service';
-import { SentimentAnalysisService } from './sentiment-analysis.service';
-import { EntityType } from '@prisma/client';
+import { PrismaService } from "../../../prisma/prisma.service";
+import { KeywordManagerService } from "./keyword-manager.service";
+import { SentimentAnalysisService } from "./sentiment-analysis.service";
+import { EntityType } from "@prisma/client";
 export declare class NewsIngestionService {
     private prisma;
     private keywordManager;

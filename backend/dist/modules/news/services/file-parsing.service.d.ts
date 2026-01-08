@@ -1,5 +1,5 @@
-import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
+import { HttpService } from "@nestjs/axios";
+import { ConfigService } from "@nestjs/config";
 export declare class FileParsingService {
     private readonly httpService;
     private readonly configService;

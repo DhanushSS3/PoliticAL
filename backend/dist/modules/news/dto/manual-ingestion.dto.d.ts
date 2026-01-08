@@ -1,4 +1,4 @@
-import { ManualInputType } from '@prisma/client';
+import { ManualInputType } from "@prisma/client";
 export declare class ManualNewsIngestionDto {
     inputType: ManualInputType;
     textContent?: string;

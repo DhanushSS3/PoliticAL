@@ -44,7 +44,7 @@ let AdminController = class AdminController {
             await this.emailService.sendAccountCreatedEmail(provisionedUser.email, provisionedUser.fullName, provisionedUser.email || provisionedUser.phone, tempPassword, provisionedUser.isTrial);
         }
         return {
-            message: 'User created successfully',
+            message: "User created successfully",
             user: {
                 id: provisionedUser.id,
                 fullName: provisionedUser.fullName,
@@ -52,32 +52,34 @@ let AdminController = class AdminController {
                 phone: provisionedUser.phone,
                 role: provisionedUser.role,
                 isTrial: provisionedUser.isTrial,
-                subscription: provisionedUser.subscription ? {
-                    id: provisionedUser.subscription.id,
-                    isTrial: provisionedUser.subscription.isTrial,
-                    startsAt: provisionedUser.subscription.startsAt,
-                    endsAt: provisionedUser.subscription.endsAt,
-                    geoAccess: provisionedUser.subscription.access.map(a => ({
-                        geoUnitId: a.geoUnitId,
-                        geoUnitName: a.geoUnit.name,
-                        geoUnitLevel: a.geoUnit.level,
-                    })),
-                } : null,
+                subscription: provisionedUser.subscription
+                    ? {
+                        id: provisionedUser.subscription.id,
+                        isTrial: provisionedUser.subscription.isTrial,
+                        startsAt: provisionedUser.subscription.startsAt,
+                        endsAt: provisionedUser.subscription.endsAt,
+                        geoAccess: provisionedUser.subscription.access.map((a) => ({
+                            geoUnitId: a.geoUnitId,
+                            geoUnitName: a.geoUnit.name,
+                            geoUnitLevel: a.geoUnit.level,
+                        })),
+                    }
+                    : null,
             },
             tempPassword,
             emailSent: !!provisionedUser.email,
         };
     }
     generateTempPassword() {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-        let password = '';
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+        let password = "";
         for (let i = 0; i < 12; i++) {
             password += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         return password;
     }
     async listUsers(role, isActive, isTrial) {
-        const filters = Object.assign(Object.assign(Object.assign({}, (role && { role })), (isActive !== undefined && { isActive: isActive === 'true' })), (isTrial !== undefined && { isTrial: isTrial === 'true' }));
+        const filters = Object.assign(Object.assign(Object.assign({}, (role && { role })), (isActive !== undefined && { isActive: isActive === "true" })), (isTrial !== undefined && { isTrial: isTrial === "true" }));
         const users = await this.adminService.listUsers(filters);
         return {
             users,
@@ -87,7 +89,7 @@ let AdminController = class AdminController {
     async getUserDetails(userId) {
         const user = await this.adminService.getUserDetails(userId);
         if (!user) {
-            return { error: 'User not found' };
+            return { error: "User not found" };
         }
         return { user };
     }
@@ -97,41 +99,41 @@ let AdminController = class AdminController {
             data: updateUserDto,
         });
         return {
-            message: 'User updated successfully',
+            message: "User updated successfully",
             user,
         };
     }
     async deactivateUser(userId) {
         await this.authService.deactivateUser(userId);
         return {
-            message: 'User deactivated successfully',
+            message: "User deactivated successfully",
         };
     }
     async reactivateUser(userId) {
         await this.authService.reactivateUser(userId);
         return {
-            message: 'User reactivated successfully',
+            message: "User reactivated successfully",
         };
     }
     async createSubscription(userId, createSubscriptionDto, req) {
         const adminId = req.user.id;
         const subscription = await this.adminService.createSubscription(userId, createSubscriptionDto, adminId);
         return {
-            message: 'Subscription created successfully',
+            message: "Subscription created successfully",
             subscription,
         };
     }
     async updateSubscription(userId, updateSubscriptionDto) {
         const subscription = await this.adminService.updateSubscription(userId, updateSubscriptionDto);
         return {
-            message: 'Subscription updated successfully',
+            message: "Subscription updated successfully",
             subscription,
         };
     }
     async grantGeoAccess(userId, grantGeoAccessDto) {
         const access = await this.adminService.grantGeoAccess(userId, grantGeoAccessDto);
         return {
-            message: 'Geo access granted successfully',
+            message: "Geo access granted successfully",
             access,
         };
     }
@@ -144,18 +146,18 @@ let AdminController = class AdminController {
     }
     async startImpersonation(impersonateDto, req, res) {
         const adminId = req.user.id;
-        const deviceInfo = req.headers['user-agent'];
+        const deviceInfo = req.headers["user-agent"];
         const ipAddress = req.ip || req.socket.remoteAddress;
         const impersonationToken = await this.impersonationService.startImpersonation(adminId, impersonateDto, deviceInfo, ipAddress);
-        res.cookie('impersonationToken', impersonationToken, {
+        res.cookie("impersonationToken", impersonationToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
             maxAge: 4 * 60 * 60 * 1000,
         });
         const targetUser = await this.adminService.getUserDetails(impersonateDto.targetUserId);
         return {
-            message: 'Impersonation started',
+            message: "Impersonation started",
             impersonationToken,
             targetUser: {
                 id: targetUser.id,
@@ -164,15 +166,15 @@ let AdminController = class AdminController {
                 phone: targetUser.phone,
                 role: targetUser.role,
             },
-            expiresIn: '4 hours',
+            expiresIn: "4 hours",
         };
     }
     async stopImpersonation(req, res) {
         const impersonationToken = req.impersonationToken;
-        await this.impersonationService.stopImpersonation(impersonationToken, 'EXPLICIT_STOP');
-        res.clearCookie('impersonationToken');
+        await this.impersonationService.stopImpersonation(impersonationToken, "EXPLICIT_STOP");
+        res.clearCookie("impersonationToken");
         return {
-            message: 'Impersonation stopped',
+            message: "Impersonation stopped",
         };
     }
     async getActiveImpersonations(req, adminId) {
@@ -196,7 +198,7 @@ let AdminController = class AdminController {
 };
 exports.AdminController = AdminController;
 __decorate([
-    (0, common_1.Post)('users'),
+    (0, common_1.Post)("users"),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
@@ -204,48 +206,48 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "createUser", null);
 __decorate([
-    (0, common_1.Get)('users'),
-    __param(0, (0, common_1.Query)('role')),
-    __param(1, (0, common_1.Query)('isActive')),
-    __param(2, (0, common_1.Query)('isTrial')),
+    (0, common_1.Get)("users"),
+    __param(0, (0, common_1.Query)("role")),
+    __param(1, (0, common_1.Query)("isActive")),
+    __param(2, (0, common_1.Query)("isTrial")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, String, String]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "listUsers", null);
 __decorate([
-    (0, common_1.Get)('users/:id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)("users/:id"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "getUserDetails", null);
 __decorate([
-    (0, common_1.Patch)('users/:id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Patch)("users/:id"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, dto_2.UpdateUserDto]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "updateUser", null);
 __decorate([
-    (0, common_1.Post)('users/:id/deactivate'),
+    (0, common_1.Post)("users/:id/deactivate"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "deactivateUser", null);
 __decorate([
-    (0, common_1.Post)('users/:id/reactivate'),
+    (0, common_1.Post)("users/:id/reactivate"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "reactivateUser", null);
 __decorate([
-    (0, common_1.Post)('users/:id/subscription'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Post)("users/:id/subscription"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
@@ -253,30 +255,30 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "createSubscription", null);
 __decorate([
-    (0, common_1.Patch)('users/:id/subscription'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Patch)("users/:id/subscription"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "updateSubscription", null);
 __decorate([
-    (0, common_1.Post)('users/:id/geo-access'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Post)("users/:id/geo-access"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, dto_2.GrantGeoAccessDto]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "grantGeoAccess", null);
 __decorate([
-    (0, common_1.Get)('users/:id/geo-access'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)("users/:id/geo-access"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "getUserGeoAccess", null);
 __decorate([
-    (0, common_1.Post)('impersonate'),
+    (0, common_1.Post)("impersonate"),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Req)()),
     __param(2, (0, common_1.Res)({ passthrough: true })),
@@ -285,7 +287,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "startImpersonation", null);
 __decorate([
-    (0, common_1.Post)('stop-impersonation'),
+    (0, common_1.Post)("stop-impersonation"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, common_1.UseGuards)(impersonation_guard_1.ImpersonationGuard),
     __param(0, (0, common_1.Req)()),
@@ -295,26 +297,26 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "stopImpersonation", null);
 __decorate([
-    (0, common_1.Get)('impersonations/active'),
+    (0, common_1.Get)("impersonations/active"),
     __param(0, (0, common_1.Req)()),
-    __param(1, (0, common_1.Query)('adminId')),
+    __param(1, (0, common_1.Query)("adminId")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "getActiveImpersonations", null);
 __decorate([
-    (0, common_1.Get)('impersonations/history'),
+    (0, common_1.Get)("impersonations/history"),
     __param(0, (0, common_1.Req)()),
-    __param(1, (0, common_1.Query)('adminId')),
-    __param(2, (0, common_1.Query)('limit')),
+    __param(1, (0, common_1.Query)("adminId")),
+    __param(2, (0, common_1.Query)("limit")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "getImpersonationHistory", null);
 exports.AdminController = AdminController = __decorate([
-    (0, common_1.Controller)('admin'),
+    (0, common_1.Controller)("admin"),
     (0, common_1.UseGuards)(session_guard_1.SessionGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)('ADMIN'),
+    (0, roles_decorator_1.Roles)("ADMIN"),
     __metadata("design:paramtypes", [admin_service_1.AdminService,
         auth_service_1.AuthService,
         impersonation_service_1.ImpersonationService,

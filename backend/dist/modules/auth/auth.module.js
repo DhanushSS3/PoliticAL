@@ -31,7 +31,7 @@ exports.AuthModule = AuthModule = __decorate([
             otp_service_1.OtpService,
             session_guard_1.SessionGuard,
             impersonation_guard_1.ImpersonationGuard,
-            roles_guard_1.RolesGuard
+            roles_guard_1.RolesGuard,
         ],
         controllers: [auth_controller_1.AuthController],
         exports: [
@@ -41,7 +41,7 @@ exports.AuthModule = AuthModule = __decorate([
             otp_service_1.OtpService,
             session_guard_1.SessionGuard,
             impersonation_guard_1.ImpersonationGuard,
-            roles_guard_1.RolesGuard
+            roles_guard_1.RolesGuard,
         ],
     })
 ], AuthModule);

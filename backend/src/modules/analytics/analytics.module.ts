@@ -6,24 +6,21 @@ import { RelevanceCalculatorService } from "./services/relevance-calculator.serv
 import { CandidatePulseService } from "./services/candidate-pulse.service";
 import { AlertService } from "./services/alert.service";
 import { MonitoringManagerService } from "./services/monitoring-manager.service";
+import { DailyGeoStatsService } from "./services/daily-geo-stats.service";
 import { NewsModule } from "../news/news.module";
 
 @Module({
   imports: [NewsModule],
   providers: [
     AnalyticsService,
-    RelevanceCalculatorService,
     CandidatePulseService,
     AlertService,
     MonitoringManagerService,
+    DailyGeoStatsService,
   ],
-  controllers: [
-    AnalyticsController,
-    SubscriptionController,
-  ],
+  controllers: [AnalyticsController, SubscriptionController],
   exports: [
     AnalyticsService,
-    RelevanceCalculatorService,
     CandidatePulseService,
     AlertService,
     MonitoringManagerService,

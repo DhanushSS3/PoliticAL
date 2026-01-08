@@ -17,18 +17,18 @@ let RolesGuard = class RolesGuard {
         this.reflector = reflector;
     }
     canActivate(context) {
-        const requiredRoles = this.reflector.get('roles', context.getHandler());
+        const requiredRoles = this.reflector.get("roles", context.getHandler());
         if (!requiredRoles) {
             return true;
         }
         const request = context.switchToHttp().getRequest();
         const user = request.user;
         if (!user) {
-            throw new common_1.ForbiddenException('User not authenticated');
+            throw new common_1.ForbiddenException("User not authenticated");
         }
         const hasRole = requiredRoles.includes(user.role);
         if (!hasRole) {
-            throw new common_1.ForbiddenException(`Required role: ${requiredRoles.join(' or ')}`);
+            throw new common_1.ForbiddenException(`Required role: ${requiredRoles.join(" or ")}`);
         }
         return true;
     }

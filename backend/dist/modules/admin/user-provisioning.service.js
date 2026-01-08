@@ -21,30 +21,33 @@ let UserProvisioningService = class UserProvisioningService {
         this.geoHierarchyService = geoHierarchyService;
     }
     async provisionUser(dto, createdByAdminId) {
-        if (dto.role === 'SUBSCRIBER' && !dto.subscription) {
-            throw new common_1.BadRequestException('Subscription details required for SUBSCRIBER role');
+        if (dto.role === "SUBSCRIBER" && !dto.subscription) {
+            throw new common_1.BadRequestException("Subscription details required for SUBSCRIBER role");
         }
         if (dto.subscription) {
-            if (!dto.subscription.geoUnitIds || dto.subscription.geoUnitIds.length === 0) {
-                throw new common_1.BadRequestException('At least one geo unit must be assigned');
+            if (!dto.subscription.geoUnitIds ||
+                dto.subscription.geoUnitIds.length === 0) {
+                throw new common_1.BadRequestException("At least one geo unit must be assigned");
             }
             if (dto.subscription.durationDays === undefined) {
-                throw new common_1.BadRequestException('Subscription duration is required. Set durationDays (e.g., 30, 365) or null for lifetime');
+                throw new common_1.BadRequestException("Subscription duration is required. Set durationDays (e.g., 30, 365) or null for lifetime");
             }
             await this.geoHierarchyService.validateGeoUnits(dto.subscription.geoUnitIds);
             if (dto.subscription.isTrial) {
-                const maxConstituencies = this.configService.get('TRIAL_MAX_CONSTITUENCIES', 3);
+                const maxConstituencies = this.configService.get("TRIAL_MAX_CONSTITUENCIES", 3);
                 if (dto.subscription.geoUnitIds.length > maxConstituencies) {
                     throw new common_1.BadRequestException(`Trial users can select maximum ${maxConstituencies} geo units (children are auto-included)`);
                 }
-                if (dto.subscription.durationDays === null || dto.subscription.durationDays <= 0) {
-                    throw new common_1.BadRequestException('Trial subscriptions must have a valid expiry duration');
+                if (dto.subscription.durationDays === null ||
+                    dto.subscription.durationDays <= 0) {
+                    throw new common_1.BadRequestException("Trial subscriptions must have a valid expiry duration");
                 }
             }
         }
         let expandedGeoUnitIds = [];
         if (dto.subscription) {
-            expandedGeoUnitIds = await this.geoHierarchyService.expandGeoUnitsWithChildren(dto.subscription.geoUnitIds);
+            expandedGeoUnitIds =
+                await this.geoHierarchyService.expandGeoUnitsWithChildren(dto.subscription.geoUnitIds);
         }
         const subscriptionDates = this.calculateSubscriptionDates(dto.subscription);
         return this.prisma.$transaction(async (tx) => {
@@ -54,7 +57,7 @@ let UserProvisioningService = class UserProvisioningService {
                     fullName: dto.fullName,
                     email: dto.email,
                     phone: dto.phone,
-                    passwordHash: '',
+                    passwordHash: "",
                     role: dto.role,
                     isTrial: ((_a = dto.subscription) === null || _a === void 0 ? void 0 : _a.isTrial) || false,
                 },
@@ -111,7 +114,7 @@ let UserProvisioningService = class UserProvisioningService {
             endsAt.setDate(endsAt.getDate() + subscription.durationDays);
         }
         else {
-            throw new common_1.BadRequestException('Duration must be a positive number or null for lifetime');
+            throw new common_1.BadRequestException("Duration must be a positive number or null for lifetime");
         }
         return { startsAt, endsAt };
     }
@@ -120,12 +123,12 @@ let UserProvisioningService = class UserProvisioningService {
             where: { userId },
         });
         if (!subscription) {
-            throw new common_1.BadRequestException('User does not have a subscription');
+            throw new common_1.BadRequestException("User does not have a subscription");
         }
         await this.geoHierarchyService.validateGeoUnits(geoUnitIds);
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         if (user.isTrial) {
-            const maxConstituencies = this.configService.get('TRIAL_MAX_CONSTITUENCIES', 3);
+            const maxConstituencies = this.configService.get("TRIAL_MAX_CONSTITUENCIES", 3);
             if (geoUnitIds.length > maxConstituencies) {
                 throw new common_1.BadRequestException(`Trial users can select maximum ${maxConstituencies} geo units (children are auto-included)`);
             }
@@ -155,7 +158,7 @@ let UserProvisioningService = class UserProvisioningService {
             where: { userId },
         });
         if (!subscription) {
-            throw new common_1.BadRequestException('User does not have a subscription');
+            throw new common_1.BadRequestException("User does not have a subscription");
         }
         const currentEndsAt = subscription.endsAt || new Date();
         const newEndsAt = new Date(currentEndsAt);
@@ -168,7 +171,7 @@ let UserProvisioningService = class UserProvisioningService {
     async convertTrialToPaid(userId, durationDays) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         if (!user.isTrial) {
-            throw new common_1.BadRequestException('User is not a trial user');
+            throw new common_1.BadRequestException("User is not a trial user");
         }
         return this.prisma.$transaction(async (tx) => {
             await tx.user.update({

@@ -1,7 +1,7 @@
-import { PrismaService } from '../../prisma/prisma.service';
-import { ConfigService } from '@nestjs/config';
-import { CreateUserDto } from '../auth/dto';
-import { GeoHierarchyService } from './geo-hierarchy.service';
+import { PrismaService } from "../../prisma/prisma.service";
+import { ConfigService } from "@nestjs/config";
+import { CreateUserDto } from "../auth/dto";
+import { GeoHierarchyService } from "./geo-hierarchy.service";
 export declare class UserProvisioningService {
     private prisma;
     private configService;

@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { EntityType } from '@prisma/client';
-import { KeywordManagerService } from '../../news/services/keyword-manager.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { EntityType } from "@prisma/client";
+import { KeywordManagerService } from "../../news/services/keyword-manager.service";
 
 /**
  * MonitoringManagerService
- * 
+ *
  * Handles activation gating for entity monitoring.
  * When a candidate subscribes:
  * 1. Activate the candidate
@@ -13,9 +13,9 @@ import { KeywordManagerService } from '../../news/services/keyword-manager.servi
  * 3. Activate their party (state level)
  * 4. Activate their constituency
  * 5. Seed keywords for all activated entities
- * 
+ *
  * This reduces compute usage by 80-90% by only tracking relevant entities.
- * 
+ *
  * SOLID Principles:
  * - Single Responsibility: Only manages monitoring activation
  * - Open/Closed: Extensible via configuration
@@ -37,12 +37,15 @@ export class MonitoringManagerService {
      * - Activate party
      * - Activate constituency
      * - Seed keywords for all
-     * 
+     *
      * @param candidateId - The subscribing candidate
      * @param userId - The user account linked to subscription
      * @returns Summary of activated entities
      */
-    async activateMonitoring(candidateId: number, userId?: number): Promise<{
+    async activateMonitoring(
+        candidateId: number,
+        userId?: number,
+    ): Promise<{
         activated: number;
         entities: Array<{ type: string; id: number; reason: string }>;
     }> {
@@ -55,7 +58,7 @@ export class MonitoringManagerService {
             where: { id: candidateId },
             include: {
                 party: true,
-            }
+            },
         });
 
         if (!candidate) {
@@ -64,11 +67,13 @@ export class MonitoringManagerService {
 
         // Get profile
         const profile = await this.prisma.candidateProfile.findUnique({
-            where: { candidateId }
+            where: { candidateId },
         });
 
         if (!profile) {
-            throw new Error(`Candidate #${candidateId} has no profile. Please seed CandidateProfile first.`);
+            throw new Error(
+                `Candidate #${candidateId} has no profile. Please seed CandidateProfile first.`,
+            );
         }
 
         // 2. Mark candidate profile as subscribed
@@ -78,22 +83,32 @@ export class MonitoringManagerService {
                 isSubscribed: true,
                 userId,
                 monitoringStartedAt: new Date(),
-            }
+            },
         });
 
-        // 3. Activate the candidate entity
-        await this.activateEntity(EntityType.CANDIDATE, candidateId, 'SUBSCRIBED', candidateId);
-        activated.push({ type: 'CANDIDATE', id: candidateId, reason: 'SUBSCRIBED' });
+        // 3. Activate the candidate entity (Priority 10)
+        await this.activateEntity(
+            EntityType.CANDIDATE,
+            candidateId,
+            "SUBSCRIBED",
+            candidateId,
+            10,
+        );
+        activated.push({
+            type: "CANDIDATE",
+            id: candidateId,
+            reason: "SUBSCRIBED",
+        });
 
-        // 4. Activate opponents in same constituency
+        // 4. Activate opponents in same constituency (Priority 9)
         const opponents = await this.prisma.candidateProfile.findMany({
             where: {
                 primaryGeoUnitId: profile.primaryGeoUnitId,
                 candidateId: { not: candidateId }, // Exclude self
             },
             include: {
-                candidate: true
-            }
+                candidate: true,
+            },
         });
 
         this.logger.debug(`Found ${opponents.length} opponents in constituency`);
@@ -102,42 +117,88 @@ export class MonitoringManagerService {
             await this.activateEntity(
                 EntityType.CANDIDATE,
                 opponent.candidateId,
-                'OPPONENT',
-                candidateId
+                "OPPONENT",
+                candidateId,
+                9, // High priority for competition
             );
             activated.push({
-                type: 'CANDIDATE',
+                type: "CANDIDATE",
                 id: opponent.candidateId,
-                reason: 'OPPONENT'
+                reason: "OPPONENT",
             });
         }
 
-        // 5. Activate the party
-        await this.activateEntity(EntityType.PARTY, candidate.partyId, 'PARTY_CONTEXT', candidateId);
-        activated.push({ type: 'PARTY', id: candidate.partyId, reason: 'PARTY_CONTEXT' });
+        // 5. Activate the party (Priority 8)
+        await this.activateEntity(
+            EntityType.PARTY,
+            candidate.partyId,
+            "PARTY_CONTEXT",
+            candidateId,
+            8,
+        );
+        activated.push({
+            type: "PARTY",
+            id: candidate.partyId,
+            reason: "PARTY_CONTEXT",
+        });
 
-        // 6. Activate the constituency
+        // 6. Activate the constituency (Priority 9)
         await this.activateEntity(
             EntityType.GEO_UNIT,
             profile.primaryGeoUnitId,
-            'GEO_CONTEXT',
-            candidateId
+            "GEO_CONTEXT",
+            candidateId,
+            9, // High priority for local news
         );
         activated.push({
-            type: 'GEO_UNIT',
+            type: "GEO_UNIT",
             id: profile.primaryGeoUnitId,
-            reason: 'GEO_CONTEXT'
+            reason: "GEO_CONTEXT",
         });
 
         // 7. Seed keywords for all activated entities
         await this.seedKeywordsForActivatedEntities(candidateId, opponents);
 
-        this.logger.log(`✅ Activated monitoring for ${activated.length} entities`);
+        this.logger.log(
+            `✅ Activated monitoring for ${activated.length} entities with priority levels`,
+        );
 
         return {
             activated: activated.length,
-            entities: activated
+            entities: activated,
         };
+    }
+
+    /**
+     * Activate monitoring for a specific GeoUnit (Feature 4)
+     * Useful for tracking generic state/district news
+     */
+    async activateGeoMonitoring(geoUnitId: number): Promise<void> {
+        this.logger.log(`Activating monitoring for GeoUnit #${geoUnitId}`);
+
+        // Get GeoUnit to ensure it exists
+        const geoUnit = await this.prisma.geoUnit.findUnique({
+            where: { id: geoUnitId },
+        });
+        if (!geoUnit) throw new Error(`GeoUnit #${geoUnitId} not found`);
+
+        // Activate with Priority 9 (Medium High)
+        await this.activateEntity(
+            EntityType.GEO_UNIT,
+            geoUnitId,
+            "SUBSCRIBED",
+            0, // System/Admin triggered (0)
+            9,
+        );
+
+        // Seed keywords
+        await this.keywordManager.seedKeywordsForEntity(
+            EntityType.GEO_UNIT,
+            geoUnitId,
+            geoUnit.name,
+        );
+
+        this.logger.log(`✅ Activated monitoring for GeoUnit #${geoUnitId}`);
     }
 
     /**
@@ -152,13 +213,13 @@ export class MonitoringManagerService {
             data: {
                 isSubscribed: false,
                 monitoringEndedAt: new Date(),
-            }
+            },
         });
 
         // Deactivate all entities triggered by this candidate
         await this.prisma.entityMonitoring.updateMany({
             where: { triggeredByCandidateId: candidateId },
-            data: { isActive: false }
+            data: { isActive: false },
         });
 
         this.logger.log(`✅ Deactivated monitoring for candidate #${candidateId}`);
@@ -168,13 +229,15 @@ export class MonitoringManagerService {
      * Get list of all actively monitored entities
      * This is what NewsIngestionService should query
      */
-    async getActiveEntities(): Promise<Array<{ entityType: EntityType; entityId: number }>> {
+    async getActiveEntities(): Promise<
+        Array<{ entityType: EntityType; entityId: number }>
+    > {
         const monitoring = await this.prisma.entityMonitoring.findMany({
             where: { isActive: true },
             select: {
                 entityType: true,
-                entityId: true
-            }
+                entityId: true,
+            },
         });
 
         return monitoring;
@@ -183,48 +246,54 @@ export class MonitoringManagerService {
     /**
      * Check if an entity is actively monitored
      */
-    async isEntityActive(entityType: EntityType, entityId: number): Promise<boolean> {
+    async isEntityActive(
+        entityType: EntityType,
+        entityId: number,
+    ): Promise<boolean> {
         const monitoring = await this.prisma.entityMonitoring.findUnique({
             where: {
                 entityType_entityId: {
                     entityType,
-                    entityId
-                }
-            }
+                    entityId,
+                },
+            },
         });
 
         return monitoring?.isActive ?? false;
     }
 
     /**
-     * Private: Activate a single entity
+     * Private: Activate a single entity with priority
      */
     private async activateEntity(
         entityType: EntityType,
         entityId: number,
         reason: string,
-        triggeredBy: number
+        triggeredBy: number,
+        priority: number = 5,
     ): Promise<void> {
         await this.prisma.entityMonitoring.upsert({
             where: {
                 entityType_entityId: {
                     entityType,
-                    entityId
-                }
+                    entityId,
+                },
             },
             create: {
                 entityType,
                 entityId,
                 isActive: true,
+                priority,
                 reason,
-                triggeredByCandidateId: triggeredBy
+                triggeredByCandidateId: triggeredBy,
             },
             update: {
                 isActive: true,
+                priority, // Update priority if re-activated
                 reason,
                 triggeredByCandidateId: triggeredBy,
-                updatedAt: new Date()
-            }
+                updatedAt: new Date(),
+            },
         });
     }
 
@@ -233,12 +302,12 @@ export class MonitoringManagerService {
      */
     private async seedKeywordsForActivatedEntities(
         candidateId: number,
-        opponents: Array<{ candidateId: number; candidate: { fullName: string } }>
+        opponents: Array<{ candidateId: number; candidate: { fullName: string } }>,
     ): Promise<void> {
         // Get the main candidate
         const candidate = await this.prisma.candidate.findUnique({
             where: { id: candidateId },
-            include: { party: true, profile: true }
+            include: { party: true, profile: true },
         });
 
         if (!candidate || !candidate.profile) return;
@@ -247,7 +316,7 @@ export class MonitoringManagerService {
         await this.keywordManager.seedKeywordsForEntity(
             EntityType.CANDIDATE,
             candidateId,
-            candidate.fullName
+            candidate.fullName,
         );
 
         // Seed for opponents
@@ -255,7 +324,7 @@ export class MonitoringManagerService {
             await this.keywordManager.seedKeywordsForEntity(
                 EntityType.CANDIDATE,
                 opponent.candidateId,
-                opponent.candidate.fullName
+                opponent.candidate.fullName,
             );
         }
 
@@ -263,22 +332,55 @@ export class MonitoringManagerService {
         await this.keywordManager.seedKeywordsForEntity(
             EntityType.PARTY,
             candidate.partyId,
-            candidate.party.name
+            candidate.party.name,
         );
 
         // Seed for geo unit
         const geoUnit = await this.prisma.geoUnit.findUnique({
-            where: { id: candidate.profile.primaryGeoUnitId }
+            where: { id: candidate.profile.primaryGeoUnitId },
         });
 
         if (geoUnit) {
             await this.keywordManager.seedKeywordsForEntity(
                 EntityType.GEO_UNIT,
                 geoUnit.id,
-                geoUnit.name
+                geoUnit.name,
             );
         }
 
         this.logger.log(`✅ Keywords seeded for activated entities`);
+    }
+
+    /**
+     * Create a new Candidate and Profile (Onboarding)
+     */
+    async createCandidate(
+        fullName: string,
+        partyId: number,
+        constituencyId: number,
+        age?: number,
+        gender?: string,
+    ) {
+        const candidate = await this.prisma.candidate.create({
+            data: {
+                fullName,
+                partyId,
+                age: age || 0,
+                gender: gender || "UNKNOWN",
+                category: "GENERAL",
+            },
+        });
+
+        const profile = await this.prisma.candidateProfile.create({
+            data: {
+                candidate: { connect: { id: candidate.id } },
+                geoUnit: { connect: { id: constituencyId } },
+                party: { connect: { id: partyId } },
+                isSubscribed: false,
+            },
+        });
+
+        this.logger.log(`Created Candidate #${candidate.id} and Profile`);
+        return { candidate, profile };
     }
 }

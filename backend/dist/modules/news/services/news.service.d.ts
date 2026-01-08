@@ -1,5 +1,5 @@
-import { PrismaService } from '../../../prisma/prisma.service';
-import { GetNewsFeedDto } from '../dto/get-news.dto';
+import { PrismaService } from "../../../prisma/prisma.service";
+import { GetNewsFeedDto } from "../dto/get-news.dto";
 export declare class NewsService {
     private prisma;
     constructor(prisma: PrismaService);
@@ -10,17 +10,20 @@ export declare class NewsService {
                 createdAt: Date;
                 geoUnitId: number;
                 sourceType: import(".prisma/client").$Enums.DataSourceType;
+                sourceRefId: number;
                 sentiment: import(".prisma/client").$Enums.SentimentLabel;
                 sentimentScore: number;
                 confidence: number;
                 modelVersion: string | null;
-                sourceRefId: number;
+                relevanceWeight: number | null;
+                sourceEntityType: import(".prisma/client").$Enums.EntityType | null;
+                sourceEntityId: number | null;
             }[];
             entityMentions: {
                 id: number;
+                articleId: number;
                 entityType: import(".prisma/client").$Enums.EntityType;
                 entityId: number;
-                articleId: number;
             }[];
         } & {
             id: number;

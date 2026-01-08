@@ -1,12 +1,12 @@
-import { AdminService } from './admin.service';
-import { AuthService } from '../auth/auth.service';
-import { ImpersonationService } from '../auth/impersonation.service';
-import { EmailService } from '../email/email.service';
-import { CreateUserDto, ImpersonateDto } from '../auth/dto';
-import { CreateSubscriptionDto, GrantGeoAccessDto, UpdateUserDto } from './dto';
-import { UserProvisioningService } from './user-provisioning.service';
-import { PrismaService } from '../../prisma/prisma.service';
-import { Response } from 'express';
+import { AdminService } from "./admin.service";
+import { AuthService } from "../auth/auth.service";
+import { ImpersonationService } from "../auth/impersonation.service";
+import { EmailService } from "../email/email.service";
+import { CreateUserDto, ImpersonateDto } from "../auth/dto";
+import { CreateSubscriptionDto, GrantGeoAccessDto, UpdateUserDto } from "./dto";
+import { UserProvisioningService } from "./user-provisioning.service";
+import { PrismaService } from "../../prisma/prisma.service";
+import { Response } from "express";
 export declare class AdminController {
     private readonly adminService;
     private readonly authService;

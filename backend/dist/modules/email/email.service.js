@@ -21,12 +21,12 @@ let EmailService = EmailService_1 = class EmailService {
         this.initializeTransporter();
     }
     initializeTransporter() {
-        const smtpHost = this.configService.get('SMTP_HOST');
-        const smtpPort = this.configService.get('SMTP_PORT');
-        const smtpUser = this.configService.get('SMTP_USER');
-        const smtpPass = this.configService.get('SMTP_PASS');
+        const smtpHost = this.configService.get("SMTP_HOST");
+        const smtpPort = this.configService.get("SMTP_PORT");
+        const smtpUser = this.configService.get("SMTP_USER");
+        const smtpPass = this.configService.get("SMTP_PASS");
         if (!smtpHost || !smtpUser || !smtpPass) {
-            this.logger.warn('SMTP configuration not found. Email service will not work.');
+            this.logger.warn("SMTP configuration not found. Email service will not work.");
             return;
         }
         this.transporter = nodemailer.createTransport({
@@ -38,16 +38,16 @@ let EmailService = EmailService_1 = class EmailService {
                 pass: smtpPass,
             },
         });
-        this.logger.log('Email service initialized');
+        this.logger.log("Email service initialized");
     }
     async sendAccountCreatedEmail(email, fullName, emailOrPhone, tempPassword, isTrial = false) {
         if (!this.transporter) {
-            this.logger.warn('Email not sent: SMTP not configured');
+            this.logger.warn("Email not sent: SMTP not configured");
             return;
         }
-        const fromEmail = this.configService.get('FROM_EMAIL') || 'noreply@politicai.com';
-        const fromName = this.configService.get('FROM_NAME') || 'PoliticAI Platform';
-        const subject = 'Welcome to PoliticAI - Your Account Has Been Created';
+        const fromEmail = this.configService.get("FROM_EMAIL") || "noreply@politicai.com";
+        const fromName = this.configService.get("FROM_NAME") || "PoliticAI Platform";
+        const subject = "Welcome to PoliticAI - Your Account Has Been Created";
         const html = this.getAccountCreatedTemplate(fullName, emailOrPhone, tempPassword, isTrial);
         try {
             await this.transporter.sendMail({
@@ -65,7 +65,7 @@ let EmailService = EmailService_1 = class EmailService {
     getAccountCreatedTemplate(fullName, emailOrPhone, tempPassword, isTrial) {
         const trialBadge = isTrial
             ? '<div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0; border-radius: 4px;"><strong>Trial Account</strong>: Your trial period is 1 day. Contact your administrator for a full subscription.</div>'
-            : '';
+            : "";
         return `
 <!DOCTYPE html>
 <html>
@@ -159,22 +159,22 @@ let EmailService = EmailService_1 = class EmailService {
         }
         try {
             await this.transporter.verify();
-            this.logger.log('SMTP connection verified');
+            this.logger.log("SMTP connection verified");
             return true;
         }
         catch (error) {
-            this.logger.error('SMTP connection failed:', error);
+            this.logger.error("SMTP connection failed:", error);
             return false;
         }
     }
     async sendPasswordResetOtp(email, fullName, otp) {
         if (!this.transporter) {
-            this.logger.warn('Email not sent: SMTP not configured');
+            this.logger.warn("Email not sent: SMTP not configured");
             return;
         }
-        const fromEmail = this.configService.get('FROM_EMAIL') || 'noreply@politicai.com';
-        const fromName = this.configService.get('FROM_NAME') || 'PoliticAI Platform';
-        const subject = 'Password Reset OTP - PoliticAI';
+        const fromEmail = this.configService.get("FROM_EMAIL") || "noreply@politicai.com";
+        const fromName = this.configService.get("FROM_NAME") || "PoliticAI Platform";
+        const subject = "Password Reset OTP - PoliticAI";
         const html = this.getPasswordResetOtpTemplate(fullName, otp);
         try {
             await this.transporter.sendMail({
@@ -191,12 +191,12 @@ let EmailService = EmailService_1 = class EmailService {
     }
     async sendPasswordChangedEmail(email, fullName) {
         if (!this.transporter) {
-            this.logger.warn('Email not sent: SMTP not configured');
+            this.logger.warn("Email not sent: SMTP not configured");
             return;
         }
-        const fromEmail = this.configService.get('FROM_EMAIL') || 'noreply@politicai.com';
-        const fromName = this.configService.get('FROM_NAME') || 'PoliticAI Platform';
-        const subject = 'Password Changed - PoliticAI';
+        const fromEmail = this.configService.get("FROM_EMAIL") || "noreply@politicai.com";
+        const fromName = this.configService.get("FROM_NAME") || "PoliticAI Platform";
+        const subject = "Password Changed - PoliticAI";
         const html = this.getPasswordChangedTemplate(fullName);
         try {
             await this.transporter.sendMail({
@@ -213,12 +213,12 @@ let EmailService = EmailService_1 = class EmailService {
     }
     async sendPasswordResetConfirmation(email, fullName) {
         if (!this.transporter) {
-            this.logger.warn('Email not sent: SMTP not configured');
+            this.logger.warn("Email not sent: SMTP not configured");
             return;
         }
-        const fromEmail = this.configService.get('FROM_EMAIL') || 'noreply@politicai.com';
-        const fromName = this.configService.get('FROM_NAME') || 'PoliticAI Platform';
-        const subject = 'Password Reset Successful - PoliticAI';
+        const fromEmail = this.configService.get("FROM_EMAIL") || "noreply@politicai.com";
+        const fromName = this.configService.get("FROM_NAME") || "PoliticAI Platform";
+        const subject = "Password Reset Successful - PoliticAI";
         const html = this.getPasswordResetConfirmationTemplate(fullName);
         try {
             await this.transporter.sendMail({

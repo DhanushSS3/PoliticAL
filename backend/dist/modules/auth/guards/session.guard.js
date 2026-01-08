@@ -20,11 +20,11 @@ let SessionGuard = class SessionGuard {
         const request = context.switchToHttp().getRequest();
         const sessionToken = this.extractSessionToken(request);
         if (!sessionToken) {
-            throw new common_1.UnauthorizedException('No session token provided');
+            throw new common_1.UnauthorizedException("No session token provided");
         }
         const user = await this.authService.validateSession(sessionToken);
         if (!user) {
-            throw new common_1.UnauthorizedException('Invalid or expired session');
+            throw new common_1.UnauthorizedException("Invalid or expired session");
         }
         request.user = user;
         request.sessionToken = sessionToken;
@@ -35,7 +35,7 @@ let SessionGuard = class SessionGuard {
             return request.cookies.sessionToken;
         }
         const authHeader = request.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
+        if (authHeader && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7);
         }
         return null;

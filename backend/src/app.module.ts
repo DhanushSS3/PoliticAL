@@ -34,5 +34,4 @@ import { NewsModule } from "./modules/news/news.module";
     NewsModule,
   ],
 })
-export class AppModule { }
-
+export class AppModule {}

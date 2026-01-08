@@ -34,7 +34,7 @@ let KeywordManagerService = KeywordManagerService_1 = class KeywordManagerServic
                 });
             }
             catch (error) {
-                if (error.code !== 'P2002') {
+                if (error.code !== "P2002") {
                     this.logger.error(`Failed to seed keyword "${keyword}": ${error.message}`);
                 }
             }
@@ -52,18 +52,37 @@ let KeywordManagerService = KeywordManagerService_1 = class KeywordManagerServic
         if (keywords.length === 0) {
             return null;
         }
-        const entityClause = keywords.map(k => `"${k.keyword}"`).join(' OR ');
+        const entityClause = keywords.map((k) => `"${k.keyword}"`).join(" OR ");
         const contextTerms = [
-            'election', 'pulls', 'vote', 'campaign', 'protest',
-            'policy', 'government', 'scandal', 'development', 'constituency'
+            "election",
+            "pulls",
+            "vote",
+            "campaign",
+            "protest",
+            "policy",
+            "government",
+            "scandal",
+            "development",
+            "constituency",
         ];
-        const contextClause = contextTerms.join(' OR ');
+        const contextClause = contextTerms.join(" OR ");
         return `(${entityClause}) AND (${contextClause})`;
+    }
+    async addKeyword(entityType, entityId, keyword, priority = 5) {
+        return this.prisma.newsKeyword.create({
+            data: {
+                keyword,
+                entityType,
+                entityId,
+                isActive: true,
+                priority,
+            },
+        });
     }
     generateBaseKeywords(entityType, name) {
         const keywords = [name];
         if (entityType === client_1.EntityType.CANDIDATE) {
-            if (!name.toLowerCase().includes('karnataka')) {
+            if (!name.toLowerCase().includes("karnataka")) {
                 keywords.push(`${name} Karnataka`);
             }
         }

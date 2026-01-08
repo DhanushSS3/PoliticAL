@@ -21,7 +21,7 @@ let GeoHierarchyService = class GeoHierarchyService {
         for (const geoUnitId of geoUnitIds) {
             allGeoUnits.add(geoUnitId);
             const descendants = await this.getDescendants(geoUnitId);
-            descendants.forEach(id => allGeoUnits.add(id));
+            descendants.forEach((id) => allGeoUnits.add(id));
         }
         return Array.from(allGeoUnits);
     }
@@ -59,10 +59,10 @@ let GeoHierarchyService = class GeoHierarchyService {
             where: { id: { in: geoUnitIds } },
             select: { id: true },
         });
-        const foundIds = geoUnits.map(g => g.id);
-        const missingIds = geoUnitIds.filter(id => !foundIds.includes(id));
+        const foundIds = geoUnits.map((g) => g.id);
+        const missingIds = geoUnitIds.filter((id) => !foundIds.includes(id));
         if (missingIds.length > 0) {
-            throw new common_1.BadRequestException(`Invalid geo unit IDs: ${missingIds.join(', ')}`);
+            throw new common_1.BadRequestException(`Invalid geo unit IDs: ${missingIds.join(", ")}`);
         }
     }
 };

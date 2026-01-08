@@ -18,7 +18,7 @@ let NewsService = class NewsService {
         this.prisma = prisma;
     }
     async getNewsFeed(dto) {
-        const { page = 1, limit = 20, geoUnitId, entityId, entityType, sentiment, search } = dto;
+        const { page = 1, limit = 20, geoUnitId, entityId, entityType, sentiment, search, } = dto;
         const skip = (page - 1) * limit;
         const where = {
             status: client_1.ModerationStatus.APPROVED,
@@ -26,16 +26,16 @@ let NewsService = class NewsService {
         if (geoUnitId) {
             where.sentimentSignals = {
                 some: {
-                    geoUnitId: geoUnitId
-                }
+                    geoUnitId: geoUnitId,
+                },
             };
         }
         if (entityId && entityType) {
             where.entityMentions = {
                 some: {
                     entityId,
-                    entityType
-                }
+                    entityType,
+                },
             };
         }
         if (sentiment) {
@@ -43,22 +43,22 @@ let NewsService = class NewsService {
                 where.sentimentSignals = {
                     some: {
                         geoUnitId: geoUnitId,
-                        sentiment: sentiment
-                    }
+                        sentiment: sentiment,
+                    },
                 };
             }
             else {
                 where.sentimentSignals = {
                     some: {
-                        sentiment: sentiment
-                    }
+                        sentiment: sentiment,
+                    },
                 };
             }
         }
         if (search) {
             where.OR = [
-                { title: { contains: search, mode: 'insensitive' } },
-                { summary: { contains: search, mode: 'insensitive' } },
+                { title: { contains: search, mode: "insensitive" } },
+                { summary: { contains: search, mode: "insensitive" } },
             ];
         }
         const [items, total] = await Promise.all([
@@ -66,11 +66,11 @@ let NewsService = class NewsService {
                 where,
                 take: limit,
                 skip,
-                orderBy: { publishedAt: 'desc' },
+                orderBy: { publishedAt: "desc" },
                 include: {
                     entityMentions: true,
                     sentimentSignals: true,
-                }
+                },
             }),
             this.prisma.newsArticle.count({ where }),
         ]);

@@ -27,16 +27,16 @@ let PasswordService = class PasswordService {
             where: { id: userId },
         });
         if (!user) {
-            throw new common_1.BadRequestException('User not found');
+            throw new common_1.BadRequestException("User not found");
         }
         const isCurrentPasswordValid = await this.authService.comparePassword(dto.currentPassword, user.passwordHash);
         if (!isCurrentPasswordValid) {
-            throw new common_1.UnauthorizedException('Current password is incorrect');
+            throw new common_1.UnauthorizedException("Current password is incorrect");
         }
         this.validatePassword(dto.newPassword);
         const isSamePassword = await this.authService.comparePassword(dto.newPassword, user.passwordHash);
         if (isSamePassword) {
-            throw new common_1.BadRequestException('New password must be different from current password');
+            throw new common_1.BadRequestException("New password must be different from current password");
         }
         await this.authService.setUserPassword(userId, dto.newPassword);
         await this.authService.invalidateAllUserSessions(userId);
@@ -48,22 +48,22 @@ let PasswordService = class PasswordService {
         const user = await this.authService.findByEmailOrPhone(dto.emailOrPhone);
         if (!user) {
             return {
-                message: 'If an account exists with this email/phone, you will receive an OTP shortly.',
+                message: "If an account exists with this email/phone, you will receive an OTP shortly.",
             };
         }
         if (!user.email) {
-            throw new common_1.BadRequestException('User does not have an email address. Please contact admin.');
+            throw new common_1.BadRequestException("User does not have an email address. Please contact admin.");
         }
         const otp = await this.otpService.createPasswordResetOtp(user.id);
         await this.emailService.sendPasswordResetOtp(user.email, user.fullName, otp);
         return {
-            message: 'If an account exists with this email/phone, you will receive an OTP shortly.',
+            message: "If an account exists with this email/phone, you will receive an OTP shortly.",
         };
     }
     async resetPassword(dto) {
         const user = await this.authService.findByEmailOrPhone(dto.emailOrPhone);
         if (!user) {
-            throw new common_1.BadRequestException('Invalid credentials');
+            throw new common_1.BadRequestException("Invalid credentials");
         }
         await this.otpService.verifyOtp(user.id, dto.otp);
         this.validatePassword(dto.newPassword);
@@ -76,7 +76,7 @@ let PasswordService = class PasswordService {
     }
     validatePassword(password) {
         if (password.length < 8) {
-            throw new common_1.BadRequestException('Password must be at least 8 characters long');
+            throw new common_1.BadRequestException("Password must be at least 8 characters long");
         }
     }
 };

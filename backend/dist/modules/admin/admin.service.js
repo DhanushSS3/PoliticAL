@@ -46,7 +46,7 @@ let AdminService = class AdminService {
             where: { userId },
         });
         if (!subscription) {
-            throw new Error('User does not have a subscription');
+            throw new Error("User does not have a subscription");
         }
         await this.prisma.geoAccess.deleteMany({
             where: { subscriptionId: subscription.id },
@@ -101,7 +101,7 @@ let AdminService = class AdminService {
                 },
             },
             orderBy: {
-                createdAt: 'desc',
+                createdAt: "desc",
             },
         });
     }
@@ -137,7 +137,7 @@ let AdminService = class AdminService {
                         ipAddress: true,
                     },
                     orderBy: {
-                        createdAt: 'desc',
+                        createdAt: "desc",
                     },
                 },
             },

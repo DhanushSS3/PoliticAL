@@ -49,19 +49,19 @@ let OtpService = class OtpService {
             },
         });
         if (!otpRecord) {
-            throw new common_1.BadRequestException('Invalid OTP');
+            throw new common_1.BadRequestException("Invalid OTP");
         }
         if (new Date() > otpRecord.expiresAt) {
             await this.prisma.passwordResetOtp.delete({
                 where: { id: otpRecord.id },
             });
-            throw new common_1.BadRequestException('OTP has expired. Please request a new one.');
+            throw new common_1.BadRequestException("OTP has expired. Please request a new one.");
         }
         if (otpRecord.attempts >= this.OTP_MAX_ATTEMPTS) {
             await this.prisma.passwordResetOtp.delete({
                 where: { id: otpRecord.id },
             });
-            throw new common_1.BadRequestException('Too many failed attempts. Please request a new OTP.');
+            throw new common_1.BadRequestException("Too many failed attempts. Please request a new OTP.");
         }
         await this.prisma.passwordResetOtp.update({
             where: { id: otpRecord.id },

@@ -1,5 +1,5 @@
-import { NewsService } from './services/news.service';
-import { GetNewsFeedDto } from './dto/get-news.dto';
+import { NewsService } from "./services/news.service";
+import { GetNewsFeedDto } from "./dto/get-news.dto";
 export declare class NewsController {
     private readonly newsService;
     constructor(newsService: NewsService);
@@ -10,17 +10,20 @@ export declare class NewsController {
                 createdAt: Date;
                 geoUnitId: number;
                 sourceType: import(".prisma/client").$Enums.DataSourceType;
+                sourceRefId: number;
                 sentiment: import(".prisma/client").$Enums.SentimentLabel;
                 sentimentScore: number;
                 confidence: number;
                 modelVersion: string | null;
-                sourceRefId: number;
+                relevanceWeight: number | null;
+                sourceEntityType: import(".prisma/client").$Enums.EntityType | null;
+                sourceEntityId: number | null;
             }[];
             entityMentions: {
                 id: number;
+                articleId: number;
                 entityType: import(".prisma/client").$Enums.EntityType;
                 entityId: number;
-                articleId: number;
             }[];
         } & {
             id: number;

@@ -6,9 +6,9 @@ const news_ingestion_service_1 = require("../modules/news/services/news-ingestio
 async function bootstrap() {
     const app = await core_1.NestFactory.createApplicationContext(app_module_1.AppModule);
     const ingestionService = app.get(news_ingestion_service_1.NewsIngestionService);
-    console.log('Manually triggering ingestion via script...');
+    console.log("Manually triggering ingestion via script...");
     await ingestionService.fetchAllNews();
-    console.log('Ingestion script finished.');
+    console.log("Ingestion script finished.");
     await app.close();
 }
 bootstrap();

@@ -27,7 +27,7 @@ const bcrypt = require("bcrypt");
 let AuthService = class AuthService {
     constructor(prisma) {
         this.prisma = prisma;
-        this.SESSION_DURATION_DAYS = parseInt(process.env.SESSION_DURATION_DAYS || '9');
+        this.SESSION_DURATION_DAYS = parseInt(process.env.SESSION_DURATION_DAYS || "9");
     }
     async hashPassword(password) {
         const saltRounds = 12;
@@ -39,52 +39,50 @@ let AuthService = class AuthService {
     async findByEmailOrPhone(emailOrPhone) {
         return this.prisma.user.findFirst({
             where: {
-                OR: [
-                    { email: emailOrPhone },
-                    { phone: emailOrPhone }
-                ]
+                OR: [{ email: emailOrPhone }, { phone: emailOrPhone }],
             },
             include: {
                 subscription: {
                     include: {
                         access: {
                             include: {
-                                geoUnit: true
-                            }
-                        }
-                    }
-                }
-            }
+                                geoUnit: true,
+                            },
+                        },
+                    },
+                },
+            },
         });
     }
     async login(dto, deviceInfo, ipAddress) {
         const user = await this.findByEmailOrPhone(dto.emailOrPhone);
         if (!user) {
-            throw new common_1.UnauthorizedException('Invalid credentials');
+            throw new common_1.UnauthorizedException("Invalid credentials");
         }
         const isPasswordValid = await this.comparePassword(dto.password, user.passwordHash);
         if (!isPasswordValid) {
-            throw new common_1.UnauthorizedException('Invalid credentials');
+            throw new common_1.UnauthorizedException("Invalid credentials");
         }
         if (!user.isActive) {
-            throw new common_1.ForbiddenException('Account has been deactivated');
+            throw new common_1.ForbiddenException("Account has been deactivated");
         }
         if (user.isTrial && user.subscription) {
             const now = new Date();
-            if (user.subscription.endsAt && user.subscription.endsAt < now) {
-                throw new common_1.ForbiddenException('Trial period has expired');
+            if (user.subscription.endsAt &&
+                user.subscription.endsAt < now) {
+                throw new common_1.ForbiddenException("Trial period has expired");
             }
         }
         await this.invalidateAllUserSessions(user.id);
         const session = await this.createSession({
             userId: user.id,
             deviceInfo,
-            ipAddress
+            ipAddress,
         });
         const { passwordHash } = user, userWithoutPassword = __rest(user, ["passwordHash"]);
         return {
             user: userWithoutPassword,
-            sessionToken: session.id
+            sessionToken: session.id,
         };
     }
     async createSession(dto) {
@@ -95,8 +93,8 @@ let AuthService = class AuthService {
                 userId: dto.userId,
                 deviceInfo: dto.deviceInfo,
                 ipAddress: dto.ipAddress,
-                expiresAt
-            }
+                expiresAt,
+            },
         });
     }
     async validateSession(sessionToken) {
@@ -109,14 +107,14 @@ let AuthService = class AuthService {
                             include: {
                                 access: {
                                     include: {
-                                        geoUnit: true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                                        geoUnit: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
         });
         if (!session) {
             return null;
@@ -131,26 +129,29 @@ let AuthService = class AuthService {
             return null;
         }
         if (session.user.isTrial && session.user.subscription) {
-            if (session.user.subscription.endsAt && session.user.subscription.endsAt < now) {
+            if (session.user.subscription.endsAt &&
+                session.user.subscription.endsAt < now) {
                 await this.prisma.session.delete({ where: { id: sessionToken } });
                 return null;
             }
         }
         await this.prisma.session.update({
             where: { id: sessionToken },
-            data: { lastActivityAt: now }
+            data: { lastActivityAt: now },
         });
         return session.user;
     }
     async logout(sessionToken) {
-        await this.prisma.session.delete({
-            where: { id: sessionToken }
-        }).catch(() => {
+        await this.prisma.session
+            .delete({
+            where: { id: sessionToken },
+        })
+            .catch(() => {
         });
     }
     async invalidateAllUserSessions(userId) {
         await this.prisma.session.deleteMany({
-            where: { userId }
+            where: { userId },
         });
     }
     async createUserWithPassword(fullName, email, phone, password, role, isTrial) {
@@ -176,8 +177,8 @@ let AuthService = class AuthService {
         });
     }
     generateTempPassword() {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-        let password = '';
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+        let password = "";
         for (let i = 0; i < 12; i++) {
             password += chars.charAt(Math.floor(Math.random() * chars.length));
         }
@@ -186,14 +187,14 @@ let AuthService = class AuthService {
     async deactivateUser(userId) {
         await this.prisma.user.update({
             where: { id: userId },
-            data: { isActive: false }
+            data: { isActive: false },
         });
         await this.invalidateAllUserSessions(userId);
     }
     async reactivateUser(userId) {
         await this.prisma.user.update({
             where: { id: userId },
-            data: { isActive: true }
+            data: { isActive: true },
         });
     }
 };

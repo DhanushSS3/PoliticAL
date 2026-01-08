@@ -17,6 +17,9 @@ datasource db {
 enum UserRole {
   ADMIN
   SUBSCRIBER
+  CANDIDATE
+  ANALYST
+  PARTY_MEMBER
 }
 
 enum GeoLevel {
@@ -192,6 +195,7 @@ model EntityMonitoring {
   entityType EntityType
   entityId   Int
   isActive   Boolean  @default(true)
+  priority   Int      @default(5)     // 1-10 scale (10=Highest, 1=Lowest)
   reason     String   // SUBSCRIBED | OPPONENT | PARTY_CONTEXT | GEO_CONTEXT
   
   // Links back to the primary subscriber (the candidate who triggered this)

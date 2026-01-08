@@ -12,24 +12,24 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
-} from '@nestjs/common';
-import { AdminService } from './admin.service';
-import { AuthService } from '../auth/auth.service';
-import { ImpersonationService } from '../auth/impersonation.service';
-import { EmailService } from '../email/email.service';
-import { SessionGuard } from '../auth/guards/session.guard';
-import { ImpersonationGuard } from '../auth/guards/impersonation.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { CreateUserDto, ImpersonateDto } from '../auth/dto';
-import { CreateSubscriptionDto, GrantGeoAccessDto, UpdateUserDto } from './dto';
-import { UserProvisioningService } from './user-provisioning.service';
-import { PrismaService } from '../../prisma/prisma.service';
-import { Request, Response } from 'express';
+} from "@nestjs/common";
+import { AdminService } from "./admin.service";
+import { AuthService } from "../auth/auth.service";
+import { ImpersonationService } from "../auth/impersonation.service";
+import { EmailService } from "../email/email.service";
+import { SessionGuard } from "../auth/guards/session.guard";
+import { ImpersonationGuard } from "../auth/guards/impersonation.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { CreateUserDto, ImpersonateDto } from "../auth/dto";
+import { CreateSubscriptionDto, GrantGeoAccessDto, UpdateUserDto } from "./dto";
+import { UserProvisioningService } from "./user-provisioning.service";
+import { PrismaService } from "../../prisma/prisma.service";
+import { Request, Response } from "express";
 
-@Controller('admin')
+@Controller("admin")
 @UseGuards(SessionGuard, RolesGuard)
-@Roles('ADMIN')
+@Roles("ADMIN")
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
@@ -37,24 +37,24 @@ export class AdminController {
     private readonly impersonationService: ImpersonationService,
     private readonly emailService: EmailService,
     private readonly prisma: PrismaService,
-    private readonly userProvisioningService: UserProvisioningService
-  ) { }
+    private readonly userProvisioningService: UserProvisioningService,
+  ) {}
 
   /**
    * Create a new user with subscription and geo access (atomic operation)
-   * 
+   *
    * Industry best practice: All user setup in one API call
    * - Stripe: Create customer with payment method and subscription
    * - AWS: Create user with policies attached
    * - Auth0: Create user with roles and metadata
-   * 
+   *
    * Benefits:
    * - No orphaned users
    * - Immediate access
    * - Single email notification
    * - Atomic transaction (all or nothing)
    */
-  @Post('users')
+  @Post("users")
   async createUser(@Body() createUserDto: CreateUserDto, @Req() req: any) {
     const adminId = req.user.id;
 
@@ -64,7 +64,7 @@ export class AdminController {
     // Step 1: Provision user with subscription and geo access (atomic)
     const provisionedUser = await this.userProvisioningService.provisionUser(
       createUserDto,
-      adminId
+      adminId,
     );
 
     // Step 2: Set password
@@ -77,13 +77,13 @@ export class AdminController {
         provisionedUser.fullName,
         provisionedUser.email || provisionedUser.phone,
         tempPassword,
-        provisionedUser.isTrial
+        provisionedUser.isTrial,
       );
     }
 
     // Step 4: Return response
     return {
-      message: 'User created successfully',
+      message: "User created successfully",
       user: {
         id: provisionedUser.id,
         fullName: provisionedUser.fullName,
@@ -91,17 +91,19 @@ export class AdminController {
         phone: provisionedUser.phone,
         role: provisionedUser.role,
         isTrial: provisionedUser.isTrial,
-        subscription: provisionedUser.subscription ? {
-          id: provisionedUser.subscription.id,
-          isTrial: provisionedUser.subscription.isTrial,
-          startsAt: provisionedUser.subscription.startsAt,
-          endsAt: provisionedUser.subscription.endsAt,
-          geoAccess: provisionedUser.subscription.access.map(a => ({
-            geoUnitId: a.geoUnitId,
-            geoUnitName: a.geoUnit.name,
-            geoUnitLevel: a.geoUnit.level,
-          })),
-        } : null,
+        subscription: provisionedUser.subscription
+          ? {
+              id: provisionedUser.subscription.id,
+              isTrial: provisionedUser.subscription.isTrial,
+              startsAt: provisionedUser.subscription.startsAt,
+              endsAt: provisionedUser.subscription.endsAt,
+              geoAccess: provisionedUser.subscription.access.map((a) => ({
+                geoUnitId: a.geoUnitId,
+                geoUnitName: a.geoUnit.name,
+                geoUnitLevel: a.geoUnit.level,
+              })),
+            }
+          : null,
       },
       tempPassword, // Return for admin to share if email not sent
       emailSent: !!provisionedUser.email,
@@ -112,8 +114,8 @@ export class AdminController {
    * Generate temporary password
    */
   private generateTempPassword(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-    let password = '';
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    let password = "";
     for (let i = 0; i < 12; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
@@ -123,16 +125,16 @@ export class AdminController {
   /**
    * List all users
    */
-  @Get('users')
+  @Get("users")
   async listUsers(
-    @Query('role') role?: string,
-    @Query('isActive') isActive?: string,
-    @Query('isTrial') isTrial?: string
+    @Query("role") role?: string,
+    @Query("isActive") isActive?: string,
+    @Query("isTrial") isTrial?: string,
   ) {
     const filters = {
       ...(role && { role }),
-      ...(isActive !== undefined && { isActive: isActive === 'true' }),
-      ...(isTrial !== undefined && { isTrial: isTrial === 'true' }),
+      ...(isActive !== undefined && { isActive: isActive === "true" }),
+      ...(isTrial !== undefined && { isTrial: isTrial === "true" }),
     };
 
     const users = await this.adminService.listUsers(filters);
@@ -146,12 +148,12 @@ export class AdminController {
   /**
    * Get user details
    */
-  @Get('users/:id')
-  async getUserDetails(@Param('id', ParseIntPipe) userId: number) {
+  @Get("users/:id")
+  async getUserDetails(@Param("id", ParseIntPipe) userId: number) {
     const user = await this.adminService.getUserDetails(userId);
 
     if (!user) {
-      return { error: 'User not found' };
+      return { error: "User not found" };
     }
 
     return { user };
@@ -160,10 +162,10 @@ export class AdminController {
   /**
    * Update user
    */
-  @Patch('users/:id')
+  @Patch("users/:id")
   async updateUser(
-    @Param('id', ParseIntPipe) userId: number,
-    @Body() updateUserDto: UpdateUserDto
+    @Param("id", ParseIntPipe) userId: number,
+    @Body() updateUserDto: UpdateUserDto,
   ) {
     const user = await this.prisma.user.update({
       where: { id: userId },
@@ -171,7 +173,7 @@ export class AdminController {
     });
 
     return {
-      message: 'User updated successfully',
+      message: "User updated successfully",
       user,
     };
   }
@@ -179,48 +181,48 @@ export class AdminController {
   /**
    * Deactivate user
    */
-  @Post('users/:id/deactivate')
+  @Post("users/:id/deactivate")
   @HttpCode(HttpStatus.OK)
-  async deactivateUser(@Param('id', ParseIntPipe) userId: number) {
+  async deactivateUser(@Param("id", ParseIntPipe) userId: number) {
     await this.authService.deactivateUser(userId);
 
     return {
-      message: 'User deactivated successfully',
+      message: "User deactivated successfully",
     };
   }
 
   /**
    * Reactivate user
    */
-  @Post('users/:id/reactivate')
+  @Post("users/:id/reactivate")
   @HttpCode(HttpStatus.OK)
-  async reactivateUser(@Param('id', ParseIntPipe) userId: number) {
+  async reactivateUser(@Param("id", ParseIntPipe) userId: number) {
     await this.authService.reactivateUser(userId);
 
     return {
-      message: 'User reactivated successfully',
+      message: "User reactivated successfully",
     };
   }
 
   /**
    * Create subscription for user
    */
-  @Post('users/:id/subscription')
+  @Post("users/:id/subscription")
   async createSubscription(
-    @Param('id', ParseIntPipe) userId: number,
+    @Param("id", ParseIntPipe) userId: number,
     @Body() createSubscriptionDto: CreateSubscriptionDto,
-    @Req() req: any
+    @Req() req: any,
   ) {
     const adminId = req.user.id;
 
     const subscription = await this.adminService.createSubscription(
       userId,
       createSubscriptionDto,
-      adminId
+      adminId,
     );
 
     return {
-      message: 'Subscription created successfully',
+      message: "Subscription created successfully",
       subscription,
     };
   }
@@ -228,15 +230,18 @@ export class AdminController {
   /**
    * Update subscription
    */
-  @Patch('users/:id/subscription')
+  @Patch("users/:id/subscription")
   async updateSubscription(
-    @Param('id', ParseIntPipe) userId: number,
-    @Body() updateSubscriptionDto: Partial<CreateSubscriptionDto>
+    @Param("id", ParseIntPipe) userId: number,
+    @Body() updateSubscriptionDto: Partial<CreateSubscriptionDto>,
   ) {
-    const subscription = await this.adminService.updateSubscription(userId, updateSubscriptionDto);
+    const subscription = await this.adminService.updateSubscription(
+      userId,
+      updateSubscriptionDto,
+    );
 
     return {
-      message: 'Subscription updated successfully',
+      message: "Subscription updated successfully",
       subscription,
     };
   }
@@ -244,15 +249,18 @@ export class AdminController {
   /**
    * Grant geo access to user
    */
-  @Post('users/:id/geo-access')
+  @Post("users/:id/geo-access")
   async grantGeoAccess(
-    @Param('id', ParseIntPipe) userId: number,
-    @Body() grantGeoAccessDto: GrantGeoAccessDto
+    @Param("id", ParseIntPipe) userId: number,
+    @Body() grantGeoAccessDto: GrantGeoAccessDto,
   ) {
-    const access = await this.adminService.grantGeoAccess(userId, grantGeoAccessDto);
+    const access = await this.adminService.grantGeoAccess(
+      userId,
+      grantGeoAccessDto,
+    );
 
     return {
-      message: 'Geo access granted successfully',
+      message: "Geo access granted successfully",
       access,
     };
   }
@@ -260,8 +268,8 @@ export class AdminController {
   /**
    * Get user's geo access
    */
-  @Get('users/:id/geo-access')
-  async getUserGeoAccess(@Param('id', ParseIntPipe) userId: number) {
+  @Get("users/:id/geo-access")
+  async getUserGeoAccess(@Param("id", ParseIntPipe) userId: number) {
     const access = await this.adminService.getUserGeoAccess(userId);
 
     return {
@@ -273,36 +281,39 @@ export class AdminController {
   /**
    * Start impersonation
    */
-  @Post('impersonate')
+  @Post("impersonate")
   async startImpersonation(
     @Body() impersonateDto: ImpersonateDto,
     @Req() req: any,
-    @Res({ passthrough: true }) res: Response
+    @Res({ passthrough: true }) res: Response,
   ) {
     const adminId = req.user.id;
-    const deviceInfo = req.headers['user-agent'];
+    const deviceInfo = req.headers["user-agent"];
     const ipAddress = req.ip || req.socket.remoteAddress;
 
-    const impersonationToken = await this.impersonationService.startImpersonation(
-      adminId,
-      impersonateDto,
-      deviceInfo,
-      ipAddress
-    );
+    const impersonationToken =
+      await this.impersonationService.startImpersonation(
+        adminId,
+        impersonateDto,
+        deviceInfo,
+        ipAddress,
+      );
 
     // Set impersonation token as cookie
-    res.cookie('impersonationToken', impersonationToken, {
+    res.cookie("impersonationToken", impersonationToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
       maxAge: 4 * 60 * 60 * 1000, // 4 hours
     });
 
     // Get target user details
-    const targetUser = await this.adminService.getUserDetails(impersonateDto.targetUserId);
+    const targetUser = await this.adminService.getUserDetails(
+      impersonateDto.targetUserId,
+    );
 
     return {
-      message: 'Impersonation started',
+      message: "Impersonation started",
       impersonationToken,
       targetUser: {
         id: targetUser.id,
@@ -311,38 +322,48 @@ export class AdminController {
         phone: targetUser.phone,
         role: targetUser.role,
       },
-      expiresIn: '4 hours',
+      expiresIn: "4 hours",
     };
   }
 
   /**
    * Stop impersonation
    */
-  @Post('stop-impersonation')
+  @Post("stop-impersonation")
   @HttpCode(HttpStatus.OK)
   @UseGuards(ImpersonationGuard)
-  async stopImpersonation(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+  async stopImpersonation(
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const impersonationToken = req.impersonationToken;
 
-    await this.impersonationService.stopImpersonation(impersonationToken, 'EXPLICIT_STOP');
+    await this.impersonationService.stopImpersonation(
+      impersonationToken,
+      "EXPLICIT_STOP",
+    );
 
     // Clear cookie
-    res.clearCookie('impersonationToken');
+    res.clearCookie("impersonationToken");
 
     return {
-      message: 'Impersonation stopped',
+      message: "Impersonation stopped",
     };
   }
 
   /**
    * Get active impersonations
    */
-  @Get('impersonations/active')
-  async getActiveImpersonations(@Req() req: any, @Query('adminId') adminId?: string) {
+  @Get("impersonations/active")
+  async getActiveImpersonations(
+    @Req() req: any,
+    @Query("adminId") adminId?: string,
+  ) {
     const requestingAdminId = req.user.id;
     const filterAdminId = adminId ? parseInt(adminId) : requestingAdminId;
 
-    const impersonations = await this.impersonationService.getActiveImpersonations(filterAdminId);
+    const impersonations =
+      await this.impersonationService.getActiveImpersonations(filterAdminId);
 
     return {
       impersonations,
@@ -353,16 +374,19 @@ export class AdminController {
   /**
    * Get impersonation history (audit log)
    */
-  @Get('impersonations/history')
+  @Get("impersonations/history")
   async getImpersonationHistory(
     @Req() req: any,
-    @Query('adminId') adminId?: string,
-    @Query('limit') limit?: string
+    @Query("adminId") adminId?: string,
+    @Query("limit") limit?: string,
   ) {
     const filterAdminId = adminId ? parseInt(adminId) : undefined;
     const limitNum = limit ? parseInt(limit) : 100;
 
-    const history = await this.impersonationService.getImpersonationHistory(filterAdminId, limitNum);
+    const history = await this.impersonationService.getImpersonationHistory(
+      filterAdminId,
+      limitNum,
+    );
 
     return {
       history,

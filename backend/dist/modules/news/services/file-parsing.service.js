@@ -21,12 +21,14 @@ let FileParsingService = FileParsingService_1 = class FileParsingService {
         this.httpService = httpService;
         this.configService = configService;
         this.logger = new common_1.Logger(FileParsingService_1.name);
-        this.analysisServiceUrl = this.configService.get('ANALYSIS_SERVICE_URL') || 'http://localhost:8000';
+        this.analysisServiceUrl =
+            this.configService.get("ANALYSIS_SERVICE_URL") ||
+                "http://localhost:8000";
     }
     async parseFile(fileBuffer, filename) {
         try {
             const formData = new FormData();
-            formData.append('file', fileBuffer, filename);
+            formData.append("file", fileBuffer, filename);
             const { data } = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.analysisServiceUrl}/parse/file`, formData, {
                 headers: Object.assign({}, formData.getHeaders()),
             }));

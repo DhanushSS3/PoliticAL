@@ -1,6 +1,6 @@
-import { PrismaService } from '../../prisma/prisma.service';
-import { ImpersonateDto } from './dto';
-import { ImpersonationSession } from '@prisma/client';
+import { PrismaService } from "../../prisma/prisma.service";
+import { ImpersonateDto } from "./dto";
+import { ImpersonationSession } from "@prisma/client";
 export declare class ImpersonationService {
     private prisma;
     constructor(prisma: PrismaService);
@@ -8,10 +8,10 @@ export declare class ImpersonationService {
     startImpersonation(adminId: number, dto: ImpersonateDto, deviceInfo?: string, ipAddress?: string): Promise<string>;
     stopImpersonation(impersonationToken: string, reason?: string): Promise<void>;
     endAllImpersonationsForAdmin(adminId: number): Promise<void>;
-    validateImpersonation(impersonationToken: string): Promise<ImpersonationSession & {
+    validateImpersonation(impersonationToken: string): Promise<(ImpersonationSession & {
         admin: any;
         targetUser: any;
-    } | null>;
+    }) | null>;
     getActiveImpersonations(adminId?: number): Promise<({
         admin: {
             id: number;

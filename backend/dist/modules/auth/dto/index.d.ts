@@ -3,7 +3,7 @@ export declare class CreateUserDto {
     email?: string;
     phone: string;
     password?: string;
-    role: 'ADMIN' | 'SUBSCRIBER';
+    role: "ADMIN" | "SUBSCRIBER";
     subscription?: {
         isTrial: boolean;
         durationDays: number | null;
