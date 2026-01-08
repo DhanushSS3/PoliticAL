@@ -167,6 +167,12 @@ model CandidateProfile {
   isSelf             Boolean @default(false)
   importanceWeight   Float   @default(1.0) // CM > MLA > Ward
 
+  // Subscription & Monitoring Control ✨ NEW
+  isSubscribed       Boolean @default(false)
+  subscriptionId     Int?
+  monitoringStartedAt DateTime?
+  monitoringEndedAt   DateTime?
+
   candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   user      User?     @relation(fields: [userId], references: [id])
   geoUnit   GeoUnit   @relation(fields: [primaryGeoUnitId], references: [id])
@@ -174,6 +180,30 @@ model CandidateProfile {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([isSubscribed])
+  @@index([monitoringStartedAt])
+}
+
+/// Entity Monitoring - Flexible activation gating
+/// Tracks which entities are actively monitored and why
+model EntityMonitoring {
+  id         Int      @id @default(autoincrement())
+  entityType EntityType
+  entityId   Int
+  isActive   Boolean  @default(true)
+  reason     String   // SUBSCRIBED | OPPONENT | PARTY_CONTEXT | GEO_CONTEXT
+  
+  // Links back to the primary subscriber (the candidate who triggered this)
+  triggeredByCandidateId Int?
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([entityType, entityId])
+  @@index([isActive])
+  @@index([reason])
+  @@index([triggeredByCandidateId])
 }
 
 // ============================================================================
@@ -549,6 +579,11 @@ model SentimentSignal {
   confidence     Float    // 0.0 to 1.0
   modelVersion   String?  // e.g. "kn-en-v1" for model traceability
 
+  // ✨ Relevance Weights (Feature 1) - Performance optimization
+  relevanceWeight   Float?       // 0.4-1.0 (calculated and stored for fast queries)
+  sourceEntityType  EntityType?  // Which entity type triggered this signal
+  sourceEntityId    Int?         // ID of that entity
+
   createdAt      DateTime @default(now())
 
   // Relations
@@ -557,6 +592,8 @@ model SentimentSignal {
 
   @@index([geoUnitId, createdAt]) // Time-series analytics
   @@index([sourceType])
+  @@index([relevanceWeight])
+  @@index([sourceEntityType, sourceEntityId])
 }
 
 // ============================================================================
