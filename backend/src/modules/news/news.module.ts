@@ -6,6 +6,7 @@ import { NewsIngestionService } from './services/news-ingestion.service';
 import { SentimentAnalysisService } from './services/sentiment-analysis.service';
 import { FileParsingService } from './services/file-parsing.service';
 import { NewsService } from './services/news.service';
+import { GeoAttributionResolverService } from './services/geo-attribution-resolver.service';
 import { AdminNewsController } from './admin-news.controller';
 import { NewsController } from './news.controller';
 import { AuthModule } from '../auth/auth.module';
@@ -19,6 +20,7 @@ import { AuthModule } from '../auth/auth.module';
         SentimentAnalysisService,
         FileParsingService,
         NewsService,
+        GeoAttributionResolverService,
         // PrismaService assumed global
     ],
     exports: [
@@ -27,6 +29,7 @@ import { AuthModule } from '../auth/auth.module';
         SentimentAnalysisService,
         FileParsingService,
         NewsService,
+        GeoAttributionResolverService,
     ],
 })
 export class NewsModule { }

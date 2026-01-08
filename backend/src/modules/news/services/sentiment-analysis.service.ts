@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { GeoAttributionResolverService } from './geo-attribution-resolver.service';
 import { firstValueFrom } from 'rxjs';
 import { DataSourceType, SentimentLabel } from '@prisma/client';
 
@@ -21,6 +22,7 @@ export class SentimentAnalysisService {
         private readonly httpService: HttpService,
         private readonly configService: ConfigService,
         private readonly prisma: PrismaService,
+        private readonly geoResolver: GeoAttributionResolverService,
     ) {
         // Default to localhost:8000 if not configured
         this.analysisServiceUrl = this.configService.get<string>('ANALYSIS_SERVICE_URL') || 'http://localhost:8000';
@@ -30,7 +32,7 @@ export class SentimentAnalysisService {
      * Analyze an article and store the sentiment signal
      * @param articleId The ID of the NewsArticle
      * @param content The text content to analyze
-     * @param geoUnitId Optional explicit geoUnitId, otherwise inferred (future) or defaults to global/state
+     * @param geoUnitId Optional explicit geoUnitId (overrides resolver)
      */
     async analyzeAndStoreSentiment(articleId: number, content: string, geoUnitId?: number) {
         try {
@@ -47,33 +49,24 @@ export class SentimentAnalysisService {
 
             this.logger.debug(`Received sentiment: ${data.label} (${data.score})`);
 
-            // 2. Determine GeoUnit(s)
-            // v1 Simplification: If article is linked to a specific GeoUnit entity, use that.
-            // If linked to multiple, we might need multiple signals or an aggregate.
-            // For now, let's look up the linked entities.
-
+            // 2. Determine GeoUnit(s) using waterfall resolver
             let targetGeoUnitIds: number[] = [];
 
             if (geoUnitId) {
+                // Explicit override provided (e.g., from manual ingestion)
                 targetGeoUnitIds.push(geoUnitId);
+                this.logger.debug(`Using explicit geoUnitId: ${geoUnitId}`);
             } else {
-                // Find linked GeoUnits
-                const links = await this.prisma.newsEntityMention.findMany({
-                    where: { articleId, entityType: 'GEO_UNIT' },
-                });
-                targetGeoUnitIds = links.map(l => l.entityId);
-
-                // If no direct GeoUnit link, maybe link to parent state? 
-                // For MVP, if no geo link, we might skip sentiment storage or assign to a default "State" level unit.
-                // Let's assume for now we only store if we have a target.
+                // Use geo attribution resolver
+                targetGeoUnitIds = await this.geoResolver.resolveGeoUnits(articleId);
             }
 
             if (targetGeoUnitIds.length === 0) {
-                this.logger.warn(`No GeoUnit linked for article #${articleId}, skipping sentiment storage.`);
+                this.logger.warn(`Could not resolve any GeoUnit for article #${articleId}. Sentiment will not be stored.`);
                 return;
             }
 
-            // 3. Store Signal for each linked GeoUnit
+            // 3. Store Signal for each resolved GeoUnit
             for (const gid of targetGeoUnitIds) {
                 await this.prisma.sentimentSignal.create({
                     data: {
@@ -88,7 +81,7 @@ export class SentimentAnalysisService {
                 });
             }
 
-            this.logger.log(`Sentiment stored for article #${articleId}`);
+            this.logger.log(`✅ Sentiment stored for article #${articleId} across ${targetGeoUnitIds.length} GeoUnit(s)`);
 
         } catch (error) {
             this.logger.error(`Sentiment analysis failed for article #${articleId}: ${error.message}`);

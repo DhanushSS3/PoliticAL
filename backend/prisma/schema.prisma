@@ -108,6 +108,7 @@ model GeoUnit {
   geoAccess            GeoAccess[]
   sentimentSignals     SentimentSignal[]
   dailyStats           DailyGeoStats[]
+  candidateProfiles    CandidateProfile[]
 
   createdAt DateTime @default(now())
 
@@ -136,6 +137,7 @@ model Party {
   wonMargins         ConstituencyMarginSummary[] @relation("WinningMargins")
   runnerUpMargins    ConstituencyMarginSummary[] @relation("RunnerUpMargins")
   winningSeatsCompetitiveness SeatCompetitivenessSummary[]
+  candidateProfiles  CandidateProfile[]
 
   @@index([name]) // Search/filter by party name
 }
@@ -152,8 +154,26 @@ model Candidate {
 
   // Relations
   electionResultsRaw ElectionResultRaw[]
+  profile            CandidateProfile?
 
   @@index([partyId])
+}
+
+model CandidateProfile {
+  candidateId        Int @id
+  userId             Int? @unique  // NULL for opponents
+  primaryGeoUnitId   Int            // Constituency
+  partyId            Int
+  isSelf             Boolean @default(false)
+  importanceWeight   Float   @default(1.0) // CM > MLA > Ward
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id])
+  geoUnit   GeoUnit   @relation(fields: [primaryGeoUnitId], references: [id])
+  party     Party     @relation(fields: [partyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================================
@@ -361,6 +381,7 @@ model User {
   impersonatedSessions ImpersonationSession[] @relation("ImpersonatedUser")
   adminImpersonations  ImpersonationSession[] @relation("AdminImpersonator")
   passwordResetOtps    PasswordResetOtp[]
+  candidateProfile     CandidateProfile?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
