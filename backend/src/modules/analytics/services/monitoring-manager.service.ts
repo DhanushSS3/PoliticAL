@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { EntityType } from "@prisma/client";
 import { KeywordManagerService } from "../../news/services/keyword-manager.service";
@@ -58,6 +58,10 @@ export class MonitoringManagerService {
             where: { id: candidateId },
             include: {
                 party: true,
+                electionResultsRaw: {
+                    take: 1,
+                    orderBy: { election: { year: 'desc' } },
+                }
             },
         });
 
@@ -66,14 +70,29 @@ export class MonitoringManagerService {
         }
 
         // Get profile
-        const profile = await this.prisma.candidateProfile.findUnique({
+        // Get profile or try to auto-create from history
+        let profile = await this.prisma.candidateProfile.findUnique({
             where: { candidateId },
         });
 
         if (!profile) {
-            throw new Error(
-                `Candidate #${candidateId} has no profile. Please seed CandidateProfile first.`,
-            );
+            const latestResult = candidate.electionResultsRaw[0];
+            if (!latestResult) {
+                throw new BadRequestException(
+                    `Candidate #${candidateId} has no profile and no election history to infer Constituency. Please seed CandidateProfile first.`,
+                );
+            }
+
+            this.logger.warn(`Auto-creating profile for Candidate #${candidateId} inferred from GeoUnit #${latestResult.geoUnitId}`);
+
+            profile = await this.prisma.candidateProfile.create({
+                data: {
+                    candidate: { connect: { id: candidateId } },
+                    geoUnit: { connect: { id: latestResult.geoUnitId } },
+                    party: { connect: { id: candidate.partyId } },
+                    isSubscribed: false,
+                }
+            });
         }
 
         // 2. Mark candidate profile as subscribed
@@ -349,6 +368,65 @@ export class MonitoringManagerService {
         }
 
         this.logger.log(`✅ Keywords seeded for activated entities`);
+    }
+
+    /**
+     * Activate monitoring for a GeoUnit and interesting candidates (Viewer Mode)
+     * Called when an Analyst/Viewer is granted access to a region
+     */
+    async activateGeoScope(geoUnitId: number) {
+        // 1. Activate GeoUnit
+        await this.activateEntity(
+            EntityType.GEO_UNIT,
+            geoUnitId,
+            "GEO_ACCESS",
+            0,
+            8,
+        );
+
+        const geoUnit = await this.prisma.geoUnit.findUnique({
+            where: { id: geoUnitId },
+        });
+        if (geoUnit) {
+            await this.keywordManager.seedKeywordsForEntity(
+                EntityType.GEO_UNIT,
+                geoUnitId,
+                geoUnit.name,
+            );
+        }
+
+        // 2. Activate active candidates (from latest election)
+        const latestResult = await this.prisma.electionResultRaw.findFirst({
+            where: { geoUnitId },
+            orderBy: { election: { year: "desc" } },
+            select: { electionId: true },
+        });
+
+        if (latestResult) {
+            const candidates = await this.prisma.electionResultRaw.findMany({
+                where: {
+                    geoUnitId,
+                    electionId: latestResult.electionId,
+                },
+                include: { candidate: true },
+                take: 10, // Limit to top 10 to avoid noise from independents with 0 votes
+            });
+
+            for (const result of candidates) {
+                await this.activateEntity(
+                    EntityType.CANDIDATE,
+                    result.candidateId,
+                    "GEO_ACCESS_CONTEXT",
+                    0,
+                    7,
+                );
+                await this.keywordManager.seedKeywordsForEntity(
+                    EntityType.CANDIDATE,
+                    result.candidateId,
+                    result.candidate.fullName,
+                );
+            }
+        }
     }
 
     /**

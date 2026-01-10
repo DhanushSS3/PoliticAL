@@ -23,6 +23,7 @@ export declare class MonitoringManagerService {
     isEntityActive(entityType: EntityType, entityId: number): Promise<boolean>;
     private activateEntity;
     private seedKeywordsForActivatedEntities;
+    activateGeoScope(geoUnitId: number): Promise<void>;
     createCandidate(fullName: string, partyId: number, constituencyId: number, age?: number, gender?: string): Promise<{
         candidate: {
             id: number;

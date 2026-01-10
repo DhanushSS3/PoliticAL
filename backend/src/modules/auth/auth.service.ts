@@ -3,18 +3,55 @@ import {
   UnauthorizedException,
   ForbiddenException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma/prisma.service";
 import { LoginDto, CreateUserDto, CreateSessionDto } from "./dto";
 import * as bcrypt from "bcrypt";
 import { User, Session } from "@prisma/client";
+import { sign, verify } from "jsonwebtoken";
+import type { JwtPayload } from "jsonwebtoken";
+
+export interface AccessTokenPayload extends JwtPayload {
+  sid: string;
+  uid: number;
+}
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService) {}
-
   private readonly SESSION_DURATION_DAYS = parseInt(
     process.env.SESSION_DURATION_DAYS || "9",
   );
+  private readonly sessionDurationMs: number;
+  private readonly tokenExpirySeconds: number;
+  private readonly jwtSecret: string;
+
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService,
+  ) {
+    this.sessionDurationMs = this.SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000;
+    this.tokenExpirySeconds = this.sessionDurationMs / 1000;
+    this.jwtSecret = this.configService.get<string>("auth.secret", "dev_secret");
+  }
+
+  getSessionDurationMs(): number {
+    return this.sessionDurationMs;
+  }
+
+  verifyAccessToken(token: string): AccessTokenPayload {
+    return verify(token, this.jwtSecret) as AccessTokenPayload;
+  }
+
+  private createAccessToken(session: Session): string {
+    const payload: AccessTokenPayload = {
+      sid: session.id,
+      uid: session.userId,
+    };
+
+    return sign(payload, this.jwtSecret, {
+      expiresIn: this.tokenExpirySeconds,
+    });
+  }
 
   /**
    * Hash password using bcrypt
@@ -60,7 +97,7 @@ export class AuthService {
     dto: LoginDto,
     deviceInfo?: string,
     ipAddress?: string,
-  ): Promise<{ user: any; sessionToken: string }> {
+  ): Promise<{ user: any; accessToken: string }> {
     // Find user
     const user = await this.findByEmailOrPhone(dto.emailOrPhone);
 
@@ -107,9 +144,11 @@ export class AuthService {
     // Remove password hash from response
     const { passwordHash, ...userWithoutPassword } = user;
 
+    const accessToken = this.createAccessToken(session);
+
     return {
       user: userWithoutPassword as any,
-      sessionToken: session.id,
+      accessToken,
     };
   }
 
@@ -133,9 +172,16 @@ export class AuthService {
   /**
    * Validate session token
    */
-  async validateSession(sessionToken: string): Promise<User | null> {
+  async validateSession(
+    sessionId: string,
+    context: {
+      expectedUserId?: number;
+      deviceInfo?: string;
+      ipAddress?: string;
+    } = {},
+  ): Promise<User | null> {
     const session = await this.prisma.session.findUnique({
-      where: { id: sessionToken },
+      where: { id: sessionId },
       include: {
         user: {
           include: {
@@ -153,22 +199,48 @@ export class AuthService {
       },
     });
 
-    if (!session) {
+    if (!session || session.revoked) {
+      return null;
+    }
+
+    if (
+      context.expectedUserId !== undefined &&
+      session.userId !== context.expectedUserId
+    ) {
+      await this.logout(sessionId);
+      return null;
+    }
+
+    if (
+      session.deviceInfo &&
+      context.deviceInfo &&
+      session.deviceInfo !== context.deviceInfo
+    ) {
+      await this.logout(sessionId);
       return null;
     }
 
     // Check expiry
     const now = new Date();
     if (session.expiresAt < now) {
-      //Delete expired session
-      await this.prisma.session.delete({ where: { id: sessionToken } });
+      await this.logout(sessionId);
       return null;
+    }
+
+    if (
+      session.ipAddress &&
+      context.ipAddress &&
+      session.ipAddress !== context.ipAddress
+    ) {
+      // Soft check: log suspicious activity but do not block immediately
+      console.warn(
+        `[Auth] IP mismatch for session ${sessionId}: stored ${session.ipAddress}, received ${context.ipAddress}`,
+      );
     }
 
     // Check user is active
     if (!session.user.isActive) {
-      // Delete session for inactive user
-      await this.prisma.session.delete({ where: { id: sessionToken } });
+      await this.logout(sessionId);
       return null;
     }
 
@@ -178,14 +250,14 @@ export class AuthService {
         session.user.subscription.endsAt &&
         session.user.subscription.endsAt < now
       ) {
-        await this.prisma.session.delete({ where: { id: sessionToken } });
+        await this.logout(sessionId);
         return null;
       }
     }
 
     // Update last activity
     await this.prisma.session.update({
-      where: { id: sessionToken },
+      where: { id: sessionId },
       data: { lastActivityAt: now },
     });
 
@@ -195,13 +267,14 @@ export class AuthService {
   /**
    * Logout (destroy session)
    */
-  async logout(sessionToken: string): Promise<void> {
+  async logout(sessionId: string): Promise<void> {
     await this.prisma.session
-      .delete({
-        where: { id: sessionToken },
+      .update({
+        where: { id: sessionId },
+        data: { revoked: true, expiresAt: new Date() },
       })
       .catch(() => {
-        // Session may not exist, ignore error
+        // Session may already be revoked or missing
       });
   }
 
@@ -209,8 +282,9 @@ export class AuthService {
    * Invalidate all sessions for a user (single-device enforcement)
    */
   async invalidateAllUserSessions(userId: number): Promise<void> {
-    await this.prisma.session.deleteMany({
-      where: { userId },
+    await this.prisma.session.updateMany({
+      where: { userId, revoked: false },
+      data: { revoked: true, expiresAt: new Date() },
     });
   }
 

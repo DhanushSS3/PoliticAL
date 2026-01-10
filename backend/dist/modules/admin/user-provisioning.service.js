@@ -14,23 +14,25 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const config_1 = require("@nestjs/config");
 const geo_hierarchy_service_1 = require("./geo-hierarchy.service");
+const monitoring_manager_service_1 = require("../analytics/services/monitoring-manager.service");
 let UserProvisioningService = class UserProvisioningService {
-    constructor(prisma, configService, geoHierarchyService) {
+    constructor(prisma, configService, geoHierarchyService, monitoringManager) {
         this.prisma = prisma;
         this.configService = configService;
         this.geoHierarchyService = geoHierarchyService;
+        this.monitoringManager = monitoringManager;
     }
     async provisionUser(dto, createdByAdminId) {
+        var _a;
         if (dto.role === "SUBSCRIBER" && !dto.subscription) {
             throw new common_1.BadRequestException("Subscription details required for SUBSCRIBER role");
         }
         if (dto.subscription) {
-            if (!dto.subscription.geoUnitIds ||
-                dto.subscription.geoUnitIds.length === 0) {
+            if (!dto.subscription.geoUnitIds || dto.subscription.geoUnitIds.length === 0) {
                 throw new common_1.BadRequestException("At least one geo unit must be assigned");
             }
             if (dto.subscription.durationDays === undefined) {
-                throw new common_1.BadRequestException("Subscription duration is required. Set durationDays (e.g., 30, 365) or null for lifetime");
+                throw new common_1.BadRequestException("Subscription duration is required. Set durationDays or null for lifetime");
             }
             await this.geoHierarchyService.validateGeoUnits(dto.subscription.geoUnitIds);
             if (dto.subscription.isTrial) {
@@ -38,77 +40,77 @@ let UserProvisioningService = class UserProvisioningService {
                 if (dto.subscription.geoUnitIds.length > maxConstituencies) {
                     throw new common_1.BadRequestException(`Trial users can select maximum ${maxConstituencies} geo units (children are auto-included)`);
                 }
-                if (dto.subscription.durationDays === null ||
-                    dto.subscription.durationDays <= 0) {
+                if (dto.subscription.durationDays === null || dto.subscription.durationDays <= 0) {
                     throw new common_1.BadRequestException("Trial subscriptions must have a valid expiry duration");
                 }
             }
         }
         let expandedGeoUnitIds = [];
         if (dto.subscription) {
-            expandedGeoUnitIds =
-                await this.geoHierarchyService.expandGeoUnitsWithChildren(dto.subscription.geoUnitIds);
+            expandedGeoUnitIds = await this.geoHierarchyService.expandGeoUnitsWithChildren(dto.subscription.geoUnitIds);
         }
         const subscriptionDates = this.calculateSubscriptionDates(dto.subscription);
-        return this.prisma.$transaction(async (tx) => {
-            var _a;
-            const user = await tx.user.create({
-                data: {
-                    fullName: dto.fullName,
-                    email: dto.email,
-                    phone: dto.phone,
-                    passwordHash: "",
-                    role: dto.role,
-                    isTrial: ((_a = dto.subscription) === null || _a === void 0 ? void 0 : _a.isTrial) || false,
-                },
-            });
-            let subscription = null;
-            if (dto.subscription) {
-                subscription = await tx.subscription.create({
+        let result;
+        try {
+            result = await this.prisma.$transaction(async (tx) => {
+                var _a;
+                const user = await tx.user.create({
                     data: {
-                        userId: user.id,
-                        isTrial: dto.subscription.isTrial,
-                        startsAt: subscriptionDates.startsAt,
-                        endsAt: subscriptionDates.endsAt,
-                        createdByAdminId,
+                        fullName: dto.fullName,
+                        email: dto.email,
+                        phone: dto.phone,
+                        passwordHash: "",
+                        role: dto.role,
+                        isTrial: ((_a = dto.subscription) === null || _a === void 0 ? void 0 : _a.isTrial) || false,
                     },
                 });
-                for (const geoUnitId of expandedGeoUnitIds) {
-                    await tx.geoAccess.create({
+                let subscription = null;
+                if (dto.subscription) {
+                    subscription = await tx.subscription.create({
                         data: {
-                            id: 0,
-                            subscriptionId: subscription.id,
-                            geoUnitId,
+                            userId: user.id,
+                            isTrial: dto.subscription.isTrial,
+                            startsAt: subscriptionDates.startsAt,
+                            endsAt: subscriptionDates.endsAt,
+                            createdByAdminId,
                         },
                     });
+                    for (const geoUnitId of expandedGeoUnitIds) {
+                        await tx.geoAccess.create({
+                            data: { id: 0, subscriptionId: subscription.id, geoUnitId },
+                        });
+                    }
                 }
-            }
-            const completeUser = await tx.user.findUnique({
-                where: { id: user.id },
-                include: {
-                    subscription: {
-                        include: {
-                            access: {
-                                include: {
-                                    geoUnit: true,
-                                },
-                            },
+                return tx.user.findUnique({
+                    where: { id: user.id },
+                    include: {
+                        subscription: {
+                            include: { access: { include: { geoUnit: true } } },
                         },
                     },
-                },
+                });
             });
-            return completeUser;
-        });
+        }
+        catch (error) {
+            if (error.code === "P2002") {
+                const target = (_a = error.meta) === null || _a === void 0 ? void 0 : _a.target;
+                const field = Array.isArray(target) ? target.join(", ") : target;
+                throw new common_1.ConflictException(`User with this ${field || "credential"} already exists`);
+            }
+            throw error;
+        }
+        if (expandedGeoUnitIds.length > 0) {
+            await Promise.all(expandedGeoUnitIds.map(id => this.monitoringManager.activateGeoScope(id)));
+        }
+        return result;
     }
     calculateSubscriptionDates(subscription) {
-        if (!subscription) {
+        if (!subscription)
             return { startsAt: new Date(), endsAt: null };
-        }
         const startsAt = new Date();
         let endsAt = null;
-        if (subscription.durationDays === null) {
+        if (subscription.durationDays === null)
             endsAt = null;
-        }
         else if (subscription.durationDays > 0) {
             endsAt = new Date();
             endsAt.setDate(endsAt.getDate() + subscription.durationDays);
@@ -119,32 +121,23 @@ let UserProvisioningService = class UserProvisioningService {
         return { startsAt, endsAt };
     }
     async updateGeoAccess(userId, geoUnitIds) {
-        const subscription = await this.prisma.subscription.findUnique({
-            where: { userId },
-        });
-        if (!subscription) {
+        const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
+        if (!subscription)
             throw new common_1.BadRequestException("User does not have a subscription");
-        }
         await this.geoHierarchyService.validateGeoUnits(geoUnitIds);
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         if (user.isTrial) {
             const maxConstituencies = this.configService.get("TRIAL_MAX_CONSTITUENCIES", 3);
             if (geoUnitIds.length > maxConstituencies) {
-                throw new common_1.BadRequestException(`Trial users can select maximum ${maxConstituencies} geo units (children are auto-included)`);
+                throw new common_1.BadRequestException(`Trial users can select maximum ${maxConstituencies} geo units`);
             }
         }
         const expandedGeoUnitIds = await this.geoHierarchyService.expandGeoUnitsWithChildren(geoUnitIds);
-        return this.prisma.$transaction(async (tx) => {
-            await tx.geoAccess.deleteMany({
-                where: { subscriptionId: subscription.id },
-            });
+        const result = await this.prisma.$transaction(async (tx) => {
+            await tx.geoAccess.deleteMany({ where: { subscriptionId: subscription.id } });
             for (const geoUnitId of expandedGeoUnitIds) {
                 await tx.geoAccess.create({
-                    data: {
-                        id: 0,
-                        subscriptionId: subscription.id,
-                        geoUnitId,
-                    },
+                    data: { id: 0, subscriptionId: subscription.id, geoUnitId },
                 });
             }
             return tx.geoAccess.findMany({
@@ -152,14 +145,15 @@ let UserProvisioningService = class UserProvisioningService {
                 include: { geoUnit: true },
             });
         });
+        if (expandedGeoUnitIds.length > 0) {
+            await Promise.all(expandedGeoUnitIds.map(id => this.monitoringManager.activateGeoScope(id)));
+        }
+        return result;
     }
     async extendSubscription(userId, additionalDays) {
-        const subscription = await this.prisma.subscription.findUnique({
-            where: { userId },
-        });
-        if (!subscription) {
+        const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
+        if (!subscription)
             throw new common_1.BadRequestException("User does not have a subscription");
-        }
         const currentEndsAt = subscription.endsAt || new Date();
         const newEndsAt = new Date(currentEndsAt);
         newEndsAt.setDate(newEndsAt.getDate() + additionalDays);
@@ -170,24 +164,16 @@ let UserProvisioningService = class UserProvisioningService {
     }
     async convertTrialToPaid(userId, durationDays) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
-        if (!user.isTrial) {
+        if (!user.isTrial)
             throw new common_1.BadRequestException("User is not a trial user");
-        }
         return this.prisma.$transaction(async (tx) => {
-            await tx.user.update({
-                where: { id: userId },
-                data: { isTrial: false },
-            });
+            await tx.user.update({ where: { id: userId }, data: { isTrial: false } });
             const newEndsAt = durationDays ? new Date() : null;
-            if (newEndsAt && durationDays) {
+            if (newEndsAt && durationDays)
                 newEndsAt.setDate(newEndsAt.getDate() + durationDays);
-            }
             return tx.subscription.update({
                 where: { userId },
-                data: {
-                    isTrial: false,
-                    endsAt: newEndsAt,
-                },
+                data: { isTrial: false, endsAt: newEndsAt },
             });
         });
     }
@@ -197,6 +183,7 @@ exports.UserProvisioningService = UserProvisioningService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         config_1.ConfigService,
-        geo_hierarchy_service_1.GeoHierarchyService])
+        geo_hierarchy_service_1.GeoHierarchyService,
+        monitoring_manager_service_1.MonitoringManagerService])
 ], UserProvisioningService);
 //# sourceMappingURL=user-provisioning.service.js.map

@@ -28,16 +28,32 @@ let MonitoringManagerService = MonitoringManagerService_1 = class MonitoringMana
             where: { id: candidateId },
             include: {
                 party: true,
+                electionResultsRaw: {
+                    take: 1,
+                    orderBy: { election: { year: 'desc' } },
+                }
             },
         });
         if (!candidate) {
             throw new Error(`Candidate #${candidateId} not found`);
         }
-        const profile = await this.prisma.candidateProfile.findUnique({
+        let profile = await this.prisma.candidateProfile.findUnique({
             where: { candidateId },
         });
         if (!profile) {
-            throw new Error(`Candidate #${candidateId} has no profile. Please seed CandidateProfile first.`);
+            const latestResult = candidate.electionResultsRaw[0];
+            if (!latestResult) {
+                throw new common_1.BadRequestException(`Candidate #${candidateId} has no profile and no election history to infer Constituency. Please seed CandidateProfile first.`);
+            }
+            this.logger.warn(`Auto-creating profile for Candidate #${candidateId} inferred from GeoUnit #${latestResult.geoUnitId}`);
+            profile = await this.prisma.candidateProfile.create({
+                data: {
+                    candidate: { connect: { id: candidateId } },
+                    geoUnit: { connect: { id: latestResult.geoUnitId } },
+                    party: { connect: { id: candidate.partyId } },
+                    isSubscribed: false,
+                }
+            });
         }
         await this.prisma.candidateProfile.update({
             where: { candidateId },
@@ -182,6 +198,34 @@ let MonitoringManagerService = MonitoringManagerService_1 = class MonitoringMana
             await this.keywordManager.seedKeywordsForEntity(client_1.EntityType.GEO_UNIT, geoUnit.id, geoUnit.name);
         }
         this.logger.log(`✅ Keywords seeded for activated entities`);
+    }
+    async activateGeoScope(geoUnitId) {
+        await this.activateEntity(client_1.EntityType.GEO_UNIT, geoUnitId, "GEO_ACCESS", 0, 8);
+        const geoUnit = await this.prisma.geoUnit.findUnique({
+            where: { id: geoUnitId },
+        });
+        if (geoUnit) {
+            await this.keywordManager.seedKeywordsForEntity(client_1.EntityType.GEO_UNIT, geoUnitId, geoUnit.name);
+        }
+        const latestResult = await this.prisma.electionResultRaw.findFirst({
+            where: { geoUnitId },
+            orderBy: { election: { year: "desc" } },
+            select: { electionId: true },
+        });
+        if (latestResult) {
+            const candidates = await this.prisma.electionResultRaw.findMany({
+                where: {
+                    geoUnitId,
+                    electionId: latestResult.electionId,
+                },
+                include: { candidate: true },
+                take: 10,
+            });
+            for (const result of candidates) {
+                await this.activateEntity(client_1.EntityType.CANDIDATE, result.candidateId, "GEO_ACCESS_CONTEXT", 0, 7);
+                await this.keywordManager.seedKeywordsForEntity(client_1.EntityType.CANDIDATE, result.candidateId, result.candidate.fullName);
+            }
+        }
     }
     async createCandidate(fullName, partyId, constituencyId, age, gender) {
         const candidate = await this.prisma.candidate.create({

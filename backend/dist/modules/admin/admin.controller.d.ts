@@ -18,22 +18,18 @@ export declare class AdminController {
     createUser(createUserDto: CreateUserDto, req: any): Promise<{
         message: string;
         user: {
-            id: number;
-            fullName: string;
-            email: string;
-            phone: string;
-            role: import(".prisma/client").$Enums.UserRole;
-            isTrial: boolean;
+            id: any;
+            fullName: any;
+            email: any;
+            phone: any;
+            role: any;
+            isTrial: any;
             subscription: {
-                id: number;
-                isTrial: boolean;
-                startsAt: Date;
-                endsAt: Date;
-                geoAccess: {
-                    geoUnitId: number;
-                    geoUnitName: string;
-                    geoUnitLevel: import(".prisma/client").$Enums.GeoLevel;
-                }[];
+                id: any;
+                isTrial: any;
+                startsAt: any;
+                endsAt: any;
+                geoAccess: any;
             };
         };
         tempPassword: string;

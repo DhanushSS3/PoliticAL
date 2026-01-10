@@ -37,18 +37,20 @@ export class AuthController {
     const deviceInfo = req.headers["user-agent"];
     const ipAddress = req.ip || req.socket.remoteAddress;
 
-    const { user, sessionToken } = await this.authService.login(
+    const { user, accessToken } = await this.authService.login(
       loginDto,
       deviceInfo,
       ipAddress,
     );
 
-    // Set session token as HttpOnly cookie
-    res.cookie("sessionToken", sessionToken, {
+    const maxAge = this.authService.getSessionDurationMs();
+
+    // Set access token as HttpOnly cookie
+    res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 9 * 24 * 60 * 60 * 1000, // 9 days
+      maxAge,
     });
 
     return {
@@ -71,14 +73,14 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(SessionGuard)
   async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
-    const sessionToken = req.sessionToken;
+    const sessionId = req.sessionId;
 
-    if (sessionToken) {
-      await this.authService.logout(sessionToken);
+    if (sessionId) {
+      await this.authService.logout(sessionId);
     }
 
     // Clear cookie
-    res.clearCookie("sessionToken");
+    res.clearCookie("accessToken");
 
     return {
       message: "Logout successful",

@@ -4,7 +4,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from "@nestjs/common";
-import { AuthService } from "../auth.service";
+import { AuthService, AccessTokenPayload } from "../auth.service";
 
 @Injectable()
 export class SessionGuard implements CanActivate {
@@ -13,15 +13,26 @@ export class SessionGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
-    // Extract session token from cookie or Authorization header
-    const sessionToken = this.extractSessionToken(request);
+    // Extract access token from cookie or Authorization header
+    const accessToken = this.extractAccessToken(request);
 
-    if (!sessionToken) {
-      throw new UnauthorizedException("No session token provided");
+    if (!accessToken) {
+      throw new UnauthorizedException("No access token provided");
     }
 
-    // Validate session
-    const user = await this.authService.validateSession(sessionToken);
+    let payload: AccessTokenPayload;
+    try {
+      payload = this.authService.verifyAccessToken(accessToken);
+    } catch {
+      throw new UnauthorizedException("Invalid or expired token");
+    }
+
+    // Validate session (always hits DB)
+    const user = await this.authService.validateSession(payload.sid, {
+      expectedUserId: payload.uid,
+      deviceInfo: request.headers["user-agent"],
+      ipAddress: request.ip || request.socket?.remoteAddress,
+    });
 
     if (!user) {
       throw new UnauthorizedException("Invalid or expired session");
@@ -29,15 +40,16 @@ export class SessionGuard implements CanActivate {
 
     // Attach user to request
     request.user = user;
-    request.sessionToken = sessionToken;
+    request.sessionId = payload.sid;
+    request.accessToken = accessToken;
 
     return true;
   }
 
-  private extractSessionToken(request: any): string | null {
+  private extractAccessToken(request: any): string | null {
     // Check cookies first
-    if (request.cookies && request.cookies.sessionToken) {
-      return request.cookies.sessionToken;
+    if (request.cookies && request.cookies.accessToken) {
+      return request.cookies.accessToken;
     }
 
     // Check Authorization header

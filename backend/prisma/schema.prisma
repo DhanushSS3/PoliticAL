@@ -438,6 +438,7 @@ model Session {
   createdAt     DateTime @default(now())
   expiresAt     DateTime // Calculated from SESSION_DURATION_DAYS env
   lastActivityAt DateTime @default(now())
+  revoked       Boolean  @default(false)
   
   // Relations
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)

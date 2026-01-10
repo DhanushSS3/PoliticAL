@@ -14,12 +14,13 @@ const user_provisioning_service_1 = require("./user-provisioning.service");
 const geo_hierarchy_service_1 = require("./geo-hierarchy.service");
 const auth_module_1 = require("../auth/auth.module");
 const email_module_1 = require("../email/email.module");
+const analytics_module_1 = require("../analytics/analytics.module");
 let AdminModule = class AdminModule {
 };
 exports.AdminModule = AdminModule;
 exports.AdminModule = AdminModule = __decorate([
     (0, common_1.Module)({
-        imports: [auth_module_1.AuthModule, email_module_1.EmailModule],
+        imports: [auth_module_1.AuthModule, email_module_1.EmailModule, analytics_module_1.AnalyticsModule],
         controllers: [admin_controller_1.AdminController],
         providers: [admin_service_1.AdminService, user_provisioning_service_1.UserProvisioningService, geo_hierarchy_service_1.GeoHierarchyService],
         exports: [admin_service_1.AdminService, user_provisioning_service_1.UserProvisioningService, geo_hierarchy_service_1.GeoHierarchyService],
