@@ -4,5 +4,5 @@ export declare class SessionGuard implements CanActivate {
     private authService;
     constructor(authService: AuthService);
     canActivate(context: ExecutionContext): Promise<boolean>;
-    private extractSessionToken;
+    private extractAccessToken;
 }

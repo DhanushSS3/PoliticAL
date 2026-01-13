@@ -55,20 +55,20 @@ export declare class AdminController {
                 })[];
             } & {
                 id: number;
-                isTrial: boolean;
                 userId: number;
+                isTrial: boolean;
                 startsAt: Date;
                 endsAt: Date | null;
                 createdByAdminId: number | null;
             };
             id: number;
+            createdAt: Date;
             fullName: string;
             email: string;
             phone: string;
             role: import(".prisma/client").$Enums.UserRole;
             isActive: boolean;
             isTrial: boolean;
-            createdAt: Date;
         }[];
         total: number;
     }>;
@@ -94,26 +94,26 @@ export declare class AdminController {
                 })[];
             } & {
                 id: number;
-                isTrial: boolean;
                 userId: number;
+                isTrial: boolean;
                 startsAt: Date;
                 endsAt: Date | null;
                 createdByAdminId: number | null;
             };
             id: number;
+            createdAt: Date;
             fullName: string;
             email: string;
             phone: string;
             role: import(".prisma/client").$Enums.UserRole;
             isActive: boolean;
             isTrial: boolean;
-            createdAt: Date;
             updatedAt: Date;
             sessions: {
                 id: string;
-                createdAt: Date;
                 deviceInfo: string;
                 ipAddress: string;
+                createdAt: Date;
                 expiresAt: Date;
                 lastActivityAt: Date;
             }[];
@@ -124,6 +124,7 @@ export declare class AdminController {
         message: string;
         user: {
             id: number;
+            createdAt: Date;
             fullName: string;
             email: string | null;
             phone: string;
@@ -131,7 +132,6 @@ export declare class AdminController {
             role: import(".prisma/client").$Enums.UserRole;
             isActive: boolean;
             isTrial: boolean;
-            createdAt: Date;
             updatedAt: Date;
         };
     }>;
@@ -145,8 +145,8 @@ export declare class AdminController {
         message: string;
         subscription: {
             id: number;
-            isTrial: boolean;
             userId: number;
+            isTrial: boolean;
             startsAt: Date;
             endsAt: Date | null;
             createdByAdminId: number | null;
@@ -156,8 +156,8 @@ export declare class AdminController {
         message: string;
         subscription: {
             id: number;
-            isTrial: boolean;
             userId: number;
+            isTrial: boolean;
             startsAt: Date;
             endsAt: Date | null;
             createdByAdminId: number | null;
@@ -228,9 +228,9 @@ export declare class AdminController {
             };
         } & {
             id: string;
-            createdAt: Date;
             deviceInfo: string | null;
             ipAddress: string | null;
+            createdAt: Date;
             expiresAt: Date;
             reason: string | null;
             endedAt: Date | null;
@@ -256,9 +256,9 @@ export declare class AdminController {
             };
         } & {
             id: string;
-            createdAt: Date;
             deviceInfo: string | null;
             ipAddress: string | null;
+            createdAt: Date;
             expiresAt: Date;
             reason: string | null;
             endedAt: Date | null;

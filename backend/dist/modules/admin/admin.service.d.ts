@@ -5,16 +5,16 @@ export declare class AdminService {
     constructor(prisma: PrismaService);
     createSubscription(userId: number, dto: CreateSubscriptionDto, adminId: number): Promise<{
         id: number;
-        isTrial: boolean;
         userId: number;
+        isTrial: boolean;
         startsAt: Date;
         endsAt: Date | null;
         createdByAdminId: number | null;
     }>;
     updateSubscription(userId: number, dto: Partial<CreateSubscriptionDto>): Promise<{
         id: number;
-        isTrial: boolean;
         userId: number;
+        isTrial: boolean;
         startsAt: Date;
         endsAt: Date | null;
         createdByAdminId: number | null;
@@ -69,20 +69,20 @@ export declare class AdminService {
             })[];
         } & {
             id: number;
-            isTrial: boolean;
             userId: number;
+            isTrial: boolean;
             startsAt: Date;
             endsAt: Date | null;
             createdByAdminId: number | null;
         };
         id: number;
+        createdAt: Date;
         fullName: string;
         email: string;
         phone: string;
         role: import(".prisma/client").$Enums.UserRole;
         isActive: boolean;
         isTrial: boolean;
-        createdAt: Date;
     }[]>;
     getUserDetails(userId: number): Promise<{
         subscription: {
@@ -102,26 +102,26 @@ export declare class AdminService {
             })[];
         } & {
             id: number;
-            isTrial: boolean;
             userId: number;
+            isTrial: boolean;
             startsAt: Date;
             endsAt: Date | null;
             createdByAdminId: number | null;
         };
         id: number;
+        createdAt: Date;
         fullName: string;
         email: string;
         phone: string;
         role: import(".prisma/client").$Enums.UserRole;
         isActive: boolean;
         isTrial: boolean;
-        createdAt: Date;
         updatedAt: Date;
         sessions: {
             id: string;
-            createdAt: Date;
             deviceInfo: string;
             ipAddress: string;
+            createdAt: Date;
             expiresAt: Date;
             lastActivityAt: Date;
         }[];

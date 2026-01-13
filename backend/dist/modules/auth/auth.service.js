@@ -22,12 +22,33 @@ var __rest = (this && this.__rest) || function (s, e) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const bcrypt = require("bcrypt");
+const jsonwebtoken_1 = require("jsonwebtoken");
 let AuthService = class AuthService {
-    constructor(prisma) {
+    constructor(prisma, configService) {
         this.prisma = prisma;
+        this.configService = configService;
         this.SESSION_DURATION_DAYS = parseInt(process.env.SESSION_DURATION_DAYS || "9");
+        this.sessionDurationMs = this.SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000;
+        this.tokenExpirySeconds = this.sessionDurationMs / 1000;
+        this.jwtSecret = this.configService.get("auth.secret", "dev_secret");
+    }
+    getSessionDurationMs() {
+        return this.sessionDurationMs;
+    }
+    verifyAccessToken(token) {
+        return (0, jsonwebtoken_1.verify)(token, this.jwtSecret);
+    }
+    createAccessToken(session) {
+        const payload = {
+            sid: session.id,
+            uid: session.userId,
+        };
+        return (0, jsonwebtoken_1.sign)(payload, this.jwtSecret, {
+            expiresIn: this.tokenExpirySeconds,
+        });
     }
     async hashPassword(password) {
         const saltRounds = 12;
@@ -80,9 +101,10 @@ let AuthService = class AuthService {
             ipAddress,
         });
         const { passwordHash } = user, userWithoutPassword = __rest(user, ["passwordHash"]);
+        const accessToken = this.createAccessToken(session);
         return {
             user: userWithoutPassword,
-            sessionToken: session.id,
+            accessToken,
         };
     }
     async createSession(dto) {
@@ -97,9 +119,9 @@ let AuthService = class AuthService {
             },
         });
     }
-    async validateSession(sessionToken) {
+    async validateSession(sessionId, context = {}) {
         const session = await this.prisma.session.findUnique({
-            where: { id: sessionToken },
+            where: { id: sessionId },
             include: {
                 user: {
                     include: {
@@ -116,42 +138,60 @@ let AuthService = class AuthService {
                 },
             },
         });
-        if (!session) {
+        if (!session || session.revoked) {
+            return null;
+        }
+        if (context.expectedUserId !== undefined &&
+            session.userId !== context.expectedUserId) {
+            await this.logout(sessionId);
+            return null;
+        }
+        if (session.deviceInfo &&
+            context.deviceInfo &&
+            session.deviceInfo !== context.deviceInfo) {
+            await this.logout(sessionId);
             return null;
         }
         const now = new Date();
         if (session.expiresAt < now) {
-            await this.prisma.session.delete({ where: { id: sessionToken } });
+            await this.logout(sessionId);
             return null;
         }
+        if (session.ipAddress &&
+            context.ipAddress &&
+            session.ipAddress !== context.ipAddress) {
+            console.warn(`[Auth] IP mismatch for session ${sessionId}: stored ${session.ipAddress}, received ${context.ipAddress}`);
+        }
         if (!session.user.isActive) {
-            await this.prisma.session.delete({ where: { id: sessionToken } });
+            await this.logout(sessionId);
             return null;
         }
         if (session.user.isTrial && session.user.subscription) {
             if (session.user.subscription.endsAt &&
                 session.user.subscription.endsAt < now) {
-                await this.prisma.session.delete({ where: { id: sessionToken } });
+                await this.logout(sessionId);
                 return null;
             }
         }
         await this.prisma.session.update({
-            where: { id: sessionToken },
+            where: { id: sessionId },
             data: { lastActivityAt: now },
         });
         return session.user;
     }
-    async logout(sessionToken) {
+    async logout(sessionId) {
         await this.prisma.session
-            .delete({
-            where: { id: sessionToken },
+            .update({
+            where: { id: sessionId },
+            data: { revoked: true, expiresAt: new Date() },
         })
             .catch(() => {
         });
     }
     async invalidateAllUserSessions(userId) {
-        await this.prisma.session.deleteMany({
-            where: { userId },
+        await this.prisma.session.updateMany({
+            where: { userId, revoked: false },
+            data: { revoked: true, expiresAt: new Date() },
         });
     }
     async createUserWithPassword(fullName, email, phone, password, role, isTrial) {
@@ -201,6 +241,7 @@ let AuthService = class AuthService {
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        config_1.ConfigService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

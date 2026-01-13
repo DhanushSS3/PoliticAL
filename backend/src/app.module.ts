@@ -14,6 +14,9 @@ import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { EmailModule } from "./modules/email/email.module";
 import { NewsModule } from "./modules/news/news.module";
+import { CommonModule } from "./common/common.module";
+import { DashboardModule } from "./modules/dashboard/dashboard.module";
+import { ConstituenciesModule } from "./modules/dashboard/constituencies.module";
 
 @Module({
   imports: [
@@ -32,6 +35,9 @@ import { NewsModule } from "./modules/news/news.module";
     AdminModule,
     EmailModule,
     NewsModule,
+    CommonModule,
+    DashboardModule,
+    ConstituenciesModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

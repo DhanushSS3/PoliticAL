@@ -26,12 +26,13 @@ let AuthController = class AuthController {
     async login(loginDto, req, res) {
         const deviceInfo = req.headers["user-agent"];
         const ipAddress = req.ip || req.socket.remoteAddress;
-        const { user, sessionToken } = await this.authService.login(loginDto, deviceInfo, ipAddress);
-        res.cookie("sessionToken", sessionToken, {
+        const { user, accessToken } = await this.authService.login(loginDto, deviceInfo, ipAddress);
+        const maxAge = this.authService.getSessionDurationMs();
+        res.cookie("accessToken", accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "strict",
-            maxAge: 9 * 24 * 60 * 60 * 1000,
+            maxAge,
         });
         return {
             message: "Login successful",
@@ -46,11 +47,11 @@ let AuthController = class AuthController {
         };
     }
     async logout(req, res) {
-        const sessionToken = req.sessionToken;
-        if (sessionToken) {
-            await this.authService.logout(sessionToken);
+        const sessionId = req.sessionId;
+        if (sessionId) {
+            await this.authService.logout(sessionId);
         }
-        res.clearCookie("sessionToken");
+        res.clearCookie("accessToken");
         return {
             message: "Logout successful",
         };

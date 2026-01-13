@@ -27,9 +27,9 @@ export declare class ImpersonationService {
         };
     } & {
         id: string;
-        createdAt: Date;
         deviceInfo: string | null;
         ipAddress: string | null;
+        createdAt: Date;
         expiresAt: Date;
         reason: string | null;
         endedAt: Date | null;
@@ -52,9 +52,9 @@ export declare class ImpersonationService {
         };
     } & {
         id: string;
-        createdAt: Date;
         deviceInfo: string | null;
         ipAddress: string | null;
+        createdAt: Date;
         expiresAt: Date;
         reason: string | null;
         endedAt: Date | null;

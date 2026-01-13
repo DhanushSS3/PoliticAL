@@ -17,22 +17,35 @@ let SessionGuard = class SessionGuard {
         this.authService = authService;
     }
     async canActivate(context) {
+        var _a;
         const request = context.switchToHttp().getRequest();
-        const sessionToken = this.extractSessionToken(request);
-        if (!sessionToken) {
-            throw new common_1.UnauthorizedException("No session token provided");
+        const accessToken = this.extractAccessToken(request);
+        if (!accessToken) {
+            throw new common_1.UnauthorizedException("No access token provided");
         }
-        const user = await this.authService.validateSession(sessionToken);
+        let payload;
+        try {
+            payload = this.authService.verifyAccessToken(accessToken);
+        }
+        catch (_b) {
+            throw new common_1.UnauthorizedException("Invalid or expired token");
+        }
+        const user = await this.authService.validateSession(payload.sid, {
+            expectedUserId: payload.uid,
+            deviceInfo: request.headers["user-agent"],
+            ipAddress: request.ip || ((_a = request.socket) === null || _a === void 0 ? void 0 : _a.remoteAddress),
+        });
         if (!user) {
             throw new common_1.UnauthorizedException("Invalid or expired session");
         }
         request.user = user;
-        request.sessionToken = sessionToken;
+        request.sessionId = payload.sid;
+        request.accessToken = accessToken;
         return true;
     }
-    extractSessionToken(request) {
-        if (request.cookies && request.cookies.sessionToken) {
-            return request.cookies.sessionToken;
+    extractAccessToken(request) {
+        if (request.cookies && request.cookies.accessToken) {
+            return request.cookies.accessToken;
         }
         const authHeader = request.headers.authorization;
         if (authHeader && authHeader.startsWith("Bearer ")) {

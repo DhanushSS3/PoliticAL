@@ -40,9 +40,9 @@ export declare class SubscriptionController {
             partyId: number;
         };
         profile: {
+            userId: number | null;
             createdAt: Date;
             updatedAt: Date;
-            userId: number | null;
             partyId: number;
             candidateId: number;
             primaryGeoUnitId: number;

@@ -20,8 +20,8 @@ export declare class AdminNewsController {
         message: string;
         keyword: {
             id: number;
-            isActive: boolean;
             createdAt: Date;
+            isActive: boolean;
             updatedAt: Date;
             priority: number;
             entityType: import(".prisma/client").$Enums.EntityType;

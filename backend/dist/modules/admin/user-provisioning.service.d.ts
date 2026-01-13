@@ -27,16 +27,16 @@ export declare class UserProvisioningService {
     })[]>;
     extendSubscription(userId: number, additionalDays: number): Promise<{
         id: number;
-        isTrial: boolean;
         userId: number;
+        isTrial: boolean;
         startsAt: Date;
         endsAt: Date | null;
         createdByAdminId: number | null;
     }>;
     convertTrialToPaid(userId: number, durationDays?: number): Promise<{
         id: number;
-        isTrial: boolean;
         userId: number;
+        isTrial: boolean;
         startsAt: Date;
         endsAt: Date | null;
         createdByAdminId: number | null;

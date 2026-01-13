@@ -34,9 +34,9 @@ export declare class MonitoringManagerService {
             partyId: number;
         };
         profile: {
+            userId: number | null;
             createdAt: Date;
             updatedAt: Date;
-            userId: number | null;
             partyId: number;
             candidateId: number;
             primaryGeoUnitId: number;
