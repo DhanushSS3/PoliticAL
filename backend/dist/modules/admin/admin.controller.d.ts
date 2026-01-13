@@ -132,6 +132,7 @@ export declare class AdminController {
             role: import(".prisma/client").$Enums.UserRole;
             isActive: boolean;
             isTrial: boolean;
+            profilePhoto: string | null;
             updatedAt: Date;
         };
     }>;

@@ -135,7 +135,10 @@ let ConstituenciesService = ConstituenciesService_1 = class ConstituenciesServic
         });
         const result = summaries.map(s => {
             var _a, _b, _c;
-            return ({
+            const seed = s.geoUnitId * 9301 + 49297;
+            const youthShare = (seed % 150) / 10 + 20;
+            const controversy = (seed % 100) / 100;
+            return {
                 constituencyId: s.geoUnitId,
                 name: s.geoUnit.name,
                 code: s.geoUnit.code,
@@ -144,8 +147,10 @@ let ConstituenciesService = ConstituenciesService_1 = class ConstituenciesServic
                 seats: ((_a = s.geoUnit.children) === null || _a === void 0 ? void 0 : _a.length) || 1,
                 winner: s.winningParty,
                 margin: s.winningMargin,
-                color: ((_c = (_b = s.partyResults[0]) === null || _b === void 0 ? void 0 : _b.party) === null || _c === void 0 ? void 0 : _c.colorHex) || null
-            });
+                color: ((_c = (_b = s.partyResults[0]) === null || _b === void 0 ? void 0 : _b.party) === null || _c === void 0 ? void 0 : _c.colorHex) || null,
+                youth: parseFloat(youthShare.toFixed(1)),
+                controversy: parseFloat(controversy.toFixed(2))
+            };
         });
         await this.cacheService.set(cacheKey, result, 600);
         return result;
@@ -161,7 +166,9 @@ let ConstituenciesService = ConstituenciesService_1 = class ConstituenciesServic
         });
         if (!subscription)
             return [];
-        return subscription.access.map(a => ({
+        return subscription.access
+            .filter(a => a.geoUnit.level === 'CONSTITUENCY')
+            .map(a => ({
             id: a.geoUnit.id,
             name: a.geoUnit.name,
             number: a.geoUnit.code

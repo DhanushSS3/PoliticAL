@@ -175,6 +175,9 @@ model CandidateProfile {
   subscriptionId     Int?
   monitoringStartedAt DateTime?
   monitoringEndedAt   DateTime?
+  
+  // Opponent tracking for candidates
+  opponentId         Int?
 
   candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   user      User?     @relation(fields: [userId], references: [id])
@@ -407,6 +410,7 @@ model User {
   
   // Trial user support
   isTrial   Boolean  @default(false)
+  profilePhoto String?
 
   // Relations
   subscription Subscription?

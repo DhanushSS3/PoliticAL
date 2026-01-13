@@ -46,6 +46,7 @@ export declare class MonitoringManagerService {
             subscriptionId: number | null;
             monitoringStartedAt: Date | null;
             monitoringEndedAt: Date | null;
+            opponentId: number | null;
         };
     }>;
 }

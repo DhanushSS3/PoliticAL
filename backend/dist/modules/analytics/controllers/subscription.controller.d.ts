@@ -52,6 +52,7 @@ export declare class SubscriptionController {
             subscriptionId: number | null;
             monitoringStartedAt: Date | null;
             monitoringEndedAt: Date | null;
+            opponentId: number | null;
         };
         success: boolean;
         message: string;

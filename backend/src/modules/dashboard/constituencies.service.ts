@@ -141,17 +141,26 @@ export class ConstituenciesService {
             }
         }) as any[]; // TODO: Remove any cast and use proper mapped types
 
-        const result = summaries.map(s => ({
-            constituencyId: s.geoUnitId,
-            name: s.geoUnit.name,
-            code: s.geoUnit.code,
-            turnout: s.turnoutPercent,
-            electors: s.totalElectors,
-            seats: s.geoUnit.children?.length || 1, // District has children, Constituency is 1
-            winner: s.winningParty,
-            margin: s.winningMargin,
-            color: s.partyResults[0]?.party?.colorHex || null
-        }));
+        const result = summaries.map(s => {
+            // Mock data for new metrics (consistent based on ID)
+            const seed = s.geoUnitId * 9301 + 49297;
+            const youthShare = (seed % 150) / 10 + 20; // 20.0 to 35.0
+            const controversy = (seed % 100) / 100; // 0.00 to 0.99
+
+            return {
+                constituencyId: s.geoUnitId,
+                name: s.geoUnit.name,
+                code: s.geoUnit.code,
+                turnout: s.turnoutPercent,
+                electors: s.totalElectors,
+                seats: s.geoUnit.children?.length || 1,
+                winner: s.winningParty,
+                margin: s.winningMargin,
+                color: s.partyResults[0]?.party?.colorHex || null,
+                youth: parseFloat(youthShare.toFixed(1)),
+                controversy: parseFloat(controversy.toFixed(2))
+            };
+        });
 
         // Cache for 10 mins
         await this.cacheService.set(cacheKey, result, 600);
@@ -171,11 +180,14 @@ export class ConstituenciesService {
 
         if (!subscription) return [];
 
-        return subscription.access.map(a => ({
-            id: a.geoUnit.id,
-            name: a.geoUnit.name,
-            number: a.geoUnit.code
-        }));
+        // Filter only CONSTITUENCY level units to avoid State/District appearing in dropdown
+        return subscription.access
+            .filter(a => a.geoUnit.level === 'CONSTITUENCY')
+            .map(a => ({
+                id: a.geoUnit.id,
+                name: a.geoUnit.name, // Ensure this is not concatenated in DB
+                number: a.geoUnit.code
+            }));
     }
     async getDistrictDetails(districtName: string, electionId: string) {
         // Resolve election

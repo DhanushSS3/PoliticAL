@@ -6,12 +6,24 @@ export declare class ConstituenciesController {
         constituencyId: any;
         name: any;
         code: any;
+        turnout: number;
+        electors: any;
+        seats: any;
+        winner: any;
+        margin: number;
+        color: any;
+    }[] | {
+        constituencyId: any;
+        name: any;
+        code: any;
         turnout: any;
         electors: any;
         seats: any;
         winner: any;
         margin: any;
         color: any;
+        youth: number;
+        controversy: number;
     }[]>;
     getSubscribed(userId: string): Promise<{
         id: number;

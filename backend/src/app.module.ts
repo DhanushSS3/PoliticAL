@@ -17,6 +17,7 @@ import { NewsModule } from "./modules/news/news.module";
 import { CommonModule } from "./common/common.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
 import { ConstituenciesModule } from "./modules/dashboard/constituencies.module";
+import { NewsIntelligenceModule } from "./modules/news-intelligence/news-intelligence.module";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ConstituenciesModule } from "./modules/dashboard/constituencies.module"
     CommonModule,
     DashboardModule,
     ConstituenciesModule,
+    NewsIntelligenceModule,
   ],
 })
 export class AppModule { }
