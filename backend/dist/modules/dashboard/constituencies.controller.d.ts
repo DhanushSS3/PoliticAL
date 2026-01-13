@@ -18,4 +18,13 @@ export declare class ConstituenciesController {
         name: string;
         number: string;
     }[]>;
+    getDistrictDetails(district: string, electionId: string): Promise<{
+        constituencies: {
+            name: string;
+            sittingMLA: string;
+            party: string;
+            margin: number;
+            defeatedBy: string;
+        }[];
+    }>;
 }

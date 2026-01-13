@@ -5,6 +5,8 @@ export declare class DashboardService {
     private readonly prisma;
     private readonly logger;
     constructor(cacheService: CacheService, prisma: PrismaService);
-    getSummary(electionId?: string, stateId?: string): Promise<unknown>;
+    private resolveElectionId;
+    getSummary(electionId?: string): Promise<unknown>;
     getPartyStats(electionId: string): Promise<unknown>;
+    getHistoricalStats(): Promise<unknown>;
 }

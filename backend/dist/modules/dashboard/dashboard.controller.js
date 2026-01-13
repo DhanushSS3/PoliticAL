@@ -20,10 +20,13 @@ let DashboardController = class DashboardController {
         this.dashboardService = dashboardService;
     }
     async getSummary(electionId, stateId, someIntParam) {
-        return this.dashboardService.getSummary(electionId, stateId);
+        return this.dashboardService.getSummary(electionId);
     }
     async getPartyStats(electionId) {
         return this.dashboardService.getPartyStats(electionId);
+    }
+    async getHistoricalStats() {
+        return this.dashboardService.getHistoricalStats();
     }
 };
 exports.DashboardController = DashboardController;
@@ -43,6 +46,12 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], DashboardController.prototype, "getPartyStats", null);
+__decorate([
+    (0, common_1.Get)('historical-stats'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], DashboardController.prototype, "getHistoricalStats", null);
 exports.DashboardController = DashboardController = __decorate([
     (0, common_1.Controller)('v1/dashboard'),
     __metadata("design:paramtypes", [dashboard_service_1.DashboardService])

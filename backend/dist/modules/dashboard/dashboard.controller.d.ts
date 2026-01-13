@@ -4,4 +4,5 @@ export declare class DashboardController {
     constructor(dashboardService: DashboardService);
     getSummary(electionId?: string, stateId?: string, someIntParam?: number): Promise<unknown>;
     getPartyStats(electionId: string): Promise<unknown>;
+    getHistoricalStats(): Promise<unknown>;
 }

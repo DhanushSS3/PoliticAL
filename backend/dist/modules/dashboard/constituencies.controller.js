@@ -25,6 +25,9 @@ let ConstituenciesController = class ConstituenciesController {
     async getSubscribed(userId) {
         return this.constituenciesService.getSubscribed(parseInt(userId));
     }
+    async getDistrictDetails(district, electionId) {
+        return this.constituenciesService.getDistrictDetails(district, electionId);
+    }
 };
 exports.ConstituenciesController = ConstituenciesController;
 __decorate([
@@ -43,6 +46,14 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], ConstituenciesController.prototype, "getSubscribed", null);
+__decorate([
+    (0, common_1.Get)('district-details'),
+    __param(0, (0, common_1.Query)('district')),
+    __param(1, (0, common_1.Query)('electionId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], ConstituenciesController.prototype, "getDistrictDetails", null);
 exports.ConstituenciesController = ConstituenciesController = __decorate([
     (0, common_1.Controller)('v1/constituencies'),
     __metadata("design:paramtypes", [constituencies_service_1.ConstituenciesService])

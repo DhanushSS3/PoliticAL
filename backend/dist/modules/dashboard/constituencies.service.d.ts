@@ -21,4 +21,13 @@ export declare class ConstituenciesService {
         name: string;
         number: string;
     }[]>;
+    getDistrictDetails(districtName: string, electionId: string): Promise<{
+        constituencies: {
+            name: string;
+            sittingMLA: string;
+            party: string;
+            margin: number;
+            defeatedBy: string;
+        }[];
+    }>;
 }

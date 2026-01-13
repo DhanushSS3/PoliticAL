@@ -11,11 +11,16 @@ export class DashboardController {
         @Query('stateId') stateId?: string,
         @Query('someIntParam', new ParseIntPipe({ optional: true })) someIntParam?: number, // Example of safe integer parsing
     ) {
-        return this.dashboardService.getSummary(electionId, stateId);
+        return this.dashboardService.getSummary(electionId);
     }
 
     @Get('party-stats')
     async getPartyStats(@Query('electionId') electionId: string) {
         return this.dashboardService.getPartyStats(electionId);
+    }
+
+    @Get('historical-stats')
+    async getHistoricalStats() {
+        return this.dashboardService.getHistoricalStats();
     }
 }

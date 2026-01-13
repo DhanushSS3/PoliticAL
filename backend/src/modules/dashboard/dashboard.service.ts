@@ -12,20 +12,7 @@ export class DashboardService {
         private readonly prisma: PrismaService,
     ) { }
 
-    async getSummary(electionId?: string, stateId?: string) {
-        // 1. Resolve Election ID (default to latest Assembly election if not provided)
-        // For now assuming we have a way to get the "latest" election. 
-        // If not provided, we should probably fetch the most recent one.
-        // Converting string IDs to numbers as Prisma uses Int IDs.
-
-        const cacheKey = CacheService.getDashboardSummaryKey(
-            electionId || 'latest',
-            stateId || 'all',
-        );
-        const cached = await this.cacheService.get(cacheKey);
-        if (cached) return cached;
-
-        // TODO: proper election resolution logic. For now, picking the latest distinct election from results.
+    private async resolveElectionId(electionId?: string): Promise<number | undefined> {
         let targetElectionId = electionId ? parseInt(electionId) : undefined;
 
         if (!targetElectionId) {
@@ -34,31 +21,48 @@ export class DashboardService {
             });
             if (latestElection) targetElectionId = latestElection.id;
         }
+        return targetElectionId;
+    }
 
+    async getSummary(electionId?: string) {
+        // Resolve latest election if not provided
+        const targetElectionId = await this.resolveElectionId(electionId);
         if (!targetElectionId) {
-            return { error: "No election data found" };
+            return {
+                totalConstituencies: 0,
+                totalElectors: 0,
+                avgTurnout: 0,
+                leadingPartySeats: 0,
+                leadingParty: "N/A",
+                oppositionPartySeats: 0,
+                oppositionParty: "N/A",
+                majority: 0,
+                swing: null
+            };
         }
 
-        // Fetch Seat Summary
-        const seatSummary = await this.prisma.electionSeatSummary.findUnique({
-            where: { electionId: targetElectionId },
-            include: { winningParty: true }
-        });
+        const cacheKey = CacheService.getDashboardSummaryKey(targetElectionId.toString(), 'all');
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached) return cached;
 
-        // Fetch Aggregates if not pre-calculated
-        // For "Total Electors", "Avg Turnout", etc. we can aggregate from GeoElectionSummary
+        // Fetch basic aggregations
         const aggregations = await this.prisma.geoElectionSummary.aggregate({
-            where: { electionId: targetElectionId },
+            where: {
+                electionId: targetElectionId,
+                geoUnit: { level: 'CONSTITUENCY' }
+            },
+            _count: { id: true }, // Total constituencies
             _sum: {
                 totalElectors: true,
-                totalVotesCast: true,
-            },
-            _count: {
-                geoUnitId: true
+                totalVotesCast: true
             }
         });
 
-        const totalConstituencies = aggregations._count.geoUnitId;
+        const seatSummary = await this.prisma.electionSeatSummary.findFirst({
+            where: { electionId: targetElectionId }
+        });
+
+        const totalConstituencies = aggregations._count.id;
         const totalElectors = aggregations._sum.totalElectors || 0;
         const totalVotes = aggregations._sum.totalVotesCast || 0;
         const avgTurnout = totalElectors > 0 ? (totalVotes / totalElectors) * 100 : 0;
@@ -74,6 +78,40 @@ export class DashboardService {
         const leadingParty = partySeats[0];
         const oppositionParty = partySeats[1];
 
+        // Calculate Swing (Seat Change for Leading Party)
+        let swing = null;
+        try {
+            const history = await this.getHistoricalStats() as any[];
+            // Find current election year from ID
+            const currentElection = await this.prisma.election.findUnique({
+                where: { id: targetElectionId }
+            });
+
+            if (currentElection && leadingParty) {
+                // Sort history by year just in case
+                const sortedHistory = history.sort((a: any, b: any) => parseInt(a.year) - parseInt(b.year));
+                const currentIndex = sortedHistory.findIndex((h: any) => h.year == currentElection.year);
+
+                if (currentIndex > 0) {
+                    const currentStats = sortedHistory[currentIndex];
+                    const prevStats = sortedHistory[currentIndex - 1];
+                    const partyName = leadingParty.party.name; // e.g. "INC"
+
+                    // Historical stats keys are party names
+                    const currentSeats = currentStats[partyName] || 0;
+                    const prevSeats = prevStats[partyName] || 0;
+                    // If currentStats has logic different from partySeatSummary, use what we have in hand (partySeats[0].seatsWon)
+                    // But assume historical covers it.
+
+                    const diff = (leadingParty.seatsWon) - prevSeats; // Use actual current seats
+                    const sign = diff > 0 ? "+" : "";
+                    swing = `${sign}${diff} Seats`; // e.g. "+55 Seats"
+                }
+            }
+        } catch (e) {
+            // Ignore swing calc errors
+        }
+
         const result = {
             totalConstituencies,
             totalElectors,
@@ -83,8 +121,7 @@ export class DashboardService {
             oppositionPartySeats: oppositionParty?.seatsWon || 0,
             oppositionParty: oppositionParty?.party?.name,
             majority: seatSummary?.majorityMark || 0,
-            // "Swing" would need historical data comparison, keeping simple for now
-            swing: "+0.0%",
+            swing: swing,
         };
 
         await this.cacheService.set(cacheKey, result, 300); // 5 mins
@@ -115,6 +152,30 @@ export class DashboardService {
         }));
 
         await this.cacheService.set(cacheKey, result, 300);
+        return result;
+    }
+    async getHistoricalStats() {
+        const cacheKey = 'dashboard:historical-stats';
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached) return cached;
+
+        const elections = await this.prisma.election.findMany({
+            orderBy: { year: 'asc' },
+            include: { seatSummaries: { include: { party: true } } }
+        });
+
+        // Transform into { year: "2013", INC: 122, BJP: 40... }
+        const result = elections.map(e => {
+            const entry: any = { year: e.year.toString() };
+            e.seatSummaries.forEach(s => {
+                const partyCode = s.party.symbol ? s.party.name : s.party.name;
+                // Using name for consistency with frontend expectations (INC, BJP)
+                entry[partyCode] = s.seatsWon;
+            });
+            return entry;
+        });
+
+        await this.cacheService.set(cacheKey, result, 3600);
         return result;
     }
 }

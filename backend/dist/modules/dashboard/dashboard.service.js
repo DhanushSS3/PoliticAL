@@ -20,12 +20,7 @@ let DashboardService = DashboardService_1 = class DashboardService {
         this.prisma = prisma;
         this.logger = new common_1.Logger(DashboardService_1.name);
     }
-    async getSummary(electionId, stateId) {
-        var _a, _b;
-        const cacheKey = cache_service_1.CacheService.getDashboardSummaryKey(electionId || 'latest', stateId || 'all');
-        const cached = await this.cacheService.get(cacheKey);
-        if (cached)
-            return cached;
+    async resolveElectionId(electionId) {
         let targetElectionId = electionId ? parseInt(electionId) : undefined;
         if (!targetElectionId) {
             const latestElection = await this.prisma.election.findFirst({
@@ -34,24 +29,43 @@ let DashboardService = DashboardService_1 = class DashboardService {
             if (latestElection)
                 targetElectionId = latestElection.id;
         }
+        return targetElectionId;
+    }
+    async getSummary(electionId) {
+        var _a, _b;
+        const targetElectionId = await this.resolveElectionId(electionId);
         if (!targetElectionId) {
-            return { error: "No election data found" };
+            return {
+                totalConstituencies: 0,
+                totalElectors: 0,
+                avgTurnout: 0,
+                leadingPartySeats: 0,
+                leadingParty: "N/A",
+                oppositionPartySeats: 0,
+                oppositionParty: "N/A",
+                majority: 0,
+                swing: null
+            };
         }
-        const seatSummary = await this.prisma.electionSeatSummary.findUnique({
-            where: { electionId: targetElectionId },
-            include: { winningParty: true }
-        });
+        const cacheKey = cache_service_1.CacheService.getDashboardSummaryKey(targetElectionId.toString(), 'all');
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached)
+            return cached;
         const aggregations = await this.prisma.geoElectionSummary.aggregate({
-            where: { electionId: targetElectionId },
+            where: {
+                electionId: targetElectionId,
+                geoUnit: { level: 'CONSTITUENCY' }
+            },
+            _count: { id: true },
             _sum: {
                 totalElectors: true,
-                totalVotesCast: true,
-            },
-            _count: {
-                geoUnitId: true
+                totalVotesCast: true
             }
         });
-        const totalConstituencies = aggregations._count.geoUnitId;
+        const seatSummary = await this.prisma.electionSeatSummary.findFirst({
+            where: { electionId: targetElectionId }
+        });
+        const totalConstituencies = aggregations._count.id;
         const totalElectors = aggregations._sum.totalElectors || 0;
         const totalVotes = aggregations._sum.totalVotesCast || 0;
         const avgTurnout = totalElectors > 0 ? (totalVotes / totalElectors) * 100 : 0;
@@ -63,6 +77,29 @@ let DashboardService = DashboardService_1 = class DashboardService {
         });
         const leadingParty = partySeats[0];
         const oppositionParty = partySeats[1];
+        let swing = null;
+        try {
+            const history = await this.getHistoricalStats();
+            const currentElection = await this.prisma.election.findUnique({
+                where: { id: targetElectionId }
+            });
+            if (currentElection && leadingParty) {
+                const sortedHistory = history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
+                const currentIndex = sortedHistory.findIndex((h) => h.year == currentElection.year);
+                if (currentIndex > 0) {
+                    const currentStats = sortedHistory[currentIndex];
+                    const prevStats = sortedHistory[currentIndex - 1];
+                    const partyName = leadingParty.party.name;
+                    const currentSeats = currentStats[partyName] || 0;
+                    const prevSeats = prevStats[partyName] || 0;
+                    const diff = (leadingParty.seatsWon) - prevSeats;
+                    const sign = diff > 0 ? "+" : "";
+                    swing = `${sign}${diff} Seats`;
+                }
+            }
+        }
+        catch (e) {
+        }
         const result = {
             totalConstituencies,
             totalElectors,
@@ -72,7 +109,7 @@ let DashboardService = DashboardService_1 = class DashboardService {
             oppositionPartySeats: (oppositionParty === null || oppositionParty === void 0 ? void 0 : oppositionParty.seatsWon) || 0,
             oppositionParty: (_b = oppositionParty === null || oppositionParty === void 0 ? void 0 : oppositionParty.party) === null || _b === void 0 ? void 0 : _b.name,
             majority: (seatSummary === null || seatSummary === void 0 ? void 0 : seatSummary.majorityMark) || 0,
-            swing: "+0.0%",
+            swing: swing,
         };
         await this.cacheService.set(cacheKey, result, 300);
         return result;
@@ -98,6 +135,26 @@ let DashboardService = DashboardService_1 = class DashboardService {
             color: stat.party.colorHex || '#ccc'
         }));
         await this.cacheService.set(cacheKey, result, 300);
+        return result;
+    }
+    async getHistoricalStats() {
+        const cacheKey = 'dashboard:historical-stats';
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached)
+            return cached;
+        const elections = await this.prisma.election.findMany({
+            orderBy: { year: 'asc' },
+            include: { seatSummaries: { include: { party: true } } }
+        });
+        const result = elections.map(e => {
+            const entry = { year: e.year.toString() };
+            e.seatSummaries.forEach(s => {
+                const partyCode = s.party.symbol ? s.party.name : s.party.name;
+                entry[partyCode] = s.seatsWon;
+            });
+            return entry;
+        });
+        await this.cacheService.set(cacheKey, result, 3600);
         return result;
     }
 };

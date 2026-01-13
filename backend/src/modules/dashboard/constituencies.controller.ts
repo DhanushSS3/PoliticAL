@@ -21,4 +21,12 @@ export class ConstituenciesController {
         // In real app, userId comes from Req.user
         return this.constituenciesService.getSubscribed(parseInt(userId));
     }
+
+    @Get('district-details')
+    async getDistrictDetails(
+        @Query('district') district: string,
+        @Query('electionId') electionId: string
+    ) {
+        return this.constituenciesService.getDistrictDetails(district, electionId);
+    }
 }
