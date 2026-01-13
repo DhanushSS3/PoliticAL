@@ -78,9 +78,9 @@ export class DashboardService {
             totalConstituencies,
             totalElectors,
             avgTurnout: parseFloat(avgTurnout.toFixed(2)),
-            incSeats: leadingParty?.seatsWon || 0,
-            incParty: leadingParty?.party?.name,
-            oppositionSeats: oppositionParty?.seatsWon || 0,
+            leadingPartySeats: leadingParty?.seatsWon || 0,
+            leadingParty: leadingParty?.party?.name,
+            oppositionPartySeats: oppositionParty?.seatsWon || 0,
             oppositionParty: oppositionParty?.party?.name,
             majority: seatSummary?.majorityMark || 0,
             // "Swing" would need historical data comparison, keeping simple for now

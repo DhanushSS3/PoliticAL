@@ -9,9 +9,10 @@ export class ConstituenciesController {
     @Get('map-data')
     async getMapData(
         @Query('electionId') electionId: string,
-        @Query('metric') metric?: string
+        @Query('metric') metric?: string,
+        @Query('level') level?: 'CONSTITUENCY' | 'DISTRICT'
     ) {
-        return this.constituenciesService.getMapData(electionId, metric);
+        return this.constituenciesService.getMapData(electionId, metric, level);
     }
 
     @Get('subscribed')

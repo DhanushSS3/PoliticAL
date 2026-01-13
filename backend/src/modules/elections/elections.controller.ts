@@ -1,7 +1,12 @@
-import { Controller } from "@nestjs/common";
+import { Controller, Get } from "@nestjs/common";
 import { ElectionsService } from "./elections.service";
 
-@Controller("elections")
+@Controller("v1/elections")
 export class ElectionsController {
-  constructor(private readonly electionsService: ElectionsService) {}
+  constructor(private readonly electionsService: ElectionsService) { }
+
+  @Get()
+  async findAll() {
+    return this.electionsService.findAll();
+  }
 }

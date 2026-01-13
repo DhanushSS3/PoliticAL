@@ -16,10 +16,19 @@ let ElectionsController = class ElectionsController {
     constructor(electionsService) {
         this.electionsService = electionsService;
     }
+    async findAll() {
+        return this.electionsService.findAll();
+    }
 };
 exports.ElectionsController = ElectionsController;
+__decorate([
+    (0, common_1.Get)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], ElectionsController.prototype, "findAll", null);
 exports.ElectionsController = ElectionsController = __decorate([
-    (0, common_1.Controller)("elections"),
+    (0, common_1.Controller)("v1/elections"),
     __metadata("design:paramtypes", [elections_service_1.ElectionsService])
 ], ElectionsController);
 //# sourceMappingURL=elections.controller.js.map

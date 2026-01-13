@@ -19,8 +19,8 @@ let ConstituenciesController = class ConstituenciesController {
     constructor(constituenciesService) {
         this.constituenciesService = constituenciesService;
     }
-    async getMapData(electionId, metric) {
-        return this.constituenciesService.getMapData(electionId, metric);
+    async getMapData(electionId, metric, level) {
+        return this.constituenciesService.getMapData(electionId, metric, level);
     }
     async getSubscribed(userId) {
         return this.constituenciesService.getSubscribed(parseInt(userId));
@@ -31,8 +31,9 @@ __decorate([
     (0, common_1.Get)('map-data'),
     __param(0, (0, common_1.Query)('electionId')),
     __param(1, (0, common_1.Query)('metric')),
+    __param(2, (0, common_1.Query)('level')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [String, String, String]),
     __metadata("design:returntype", Promise)
 ], ConstituenciesController.prototype, "getMapData", null);
 __decorate([

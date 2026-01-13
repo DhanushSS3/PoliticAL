@@ -1,31 +1,49 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CacheService } from '../../common/services/cache.service';
 
 @Injectable()
 export class ConstituenciesService {
+    private readonly logger = new Logger(ConstituenciesService.name);
+
     constructor(
         private readonly prisma: PrismaService,
         private readonly cacheService: CacheService,
     ) { }
 
-    async getMapData(electionId: string, metric: string = 'turnout') {
-        const cacheKey = CacheService.getConstituencyMapKey(electionId);
+    async getMapData(electionId: string, metric: string = 'turnout', level: 'CONSTITUENCY' | 'DISTRICT' = 'CONSTITUENCY') {
+        // Resolve election ID
+        let eId = electionId ? parseInt(electionId) : undefined;
+
+        if (!eId || isNaN(eId)) {
+            const latestElection = await this.prisma.election.findFirst({
+                orderBy: { year: 'desc' },
+            });
+            if (latestElection) eId = latestElection.id;
+            else return []; // No elections found
+        }
+
+        const cacheKey = `${CacheService.getConstituencyMapKey(eId.toString())}:${level}`;
         const cached = await this.cacheService.get(cacheKey);
         // if (cached) return cached; // caching disabled for dev iteration
-
-        const eId = parseInt(electionId);
 
         // Fetch summaries with winner info
         // explicit casting to avoid type inference issues with complex selects in some prisma versions
         const summaries = await this.prisma.geoElectionSummary.findMany({
             where: {
                 electionId: eId,
-                geoUnit: { level: 'CONSTITUENCY' }
+                geoUnit: { level: level }
             },
             select: {
                 geoUnitId: true,
-                geoUnit: { select: { name: true, code: true } },
+                geoUnit: {
+                    select: {
+                        name: true,
+                        code: true,
+                        children: { select: { id: true } } // Fetch children to count them
+                    }
+                },
+                totalElectors: true,
                 turnoutPercent: true,
                 winningParty: true, // This returns the String name from schema line 281
                 winningMargin: true,
@@ -44,9 +62,11 @@ export class ConstituenciesService {
             name: s.geoUnit.name,
             code: s.geoUnit.code,
             turnout: s.turnoutPercent,
+            electors: s.totalElectors,
+            seats: s.geoUnit.children?.length || 1, // District has children, Constituency is 1
             winner: s.winningParty,
             margin: s.winningMargin,
-            color: s.partyResults[0]?.party?.colorHex || '#ccc'
+            color: s.partyResults[0]?.party?.colorHex || null
         }));
 
         // Cache for 10 mins
