@@ -79,26 +79,48 @@ let DashboardService = DashboardService_1 = class DashboardService {
         const oppositionParty = partySeats[1];
         let swing = null;
         try {
-            const history = await this.getHistoricalStats();
             const currentElection = await this.prisma.election.findUnique({
                 where: { id: targetElectionId }
             });
             if (currentElection && leadingParty) {
-                const sortedHistory = history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
-                const currentIndex = sortedHistory.findIndex((h) => h.year == currentElection.year);
-                if (currentIndex > 0) {
-                    const currentStats = sortedHistory[currentIndex];
-                    const prevStats = sortedHistory[currentIndex - 1];
-                    const partyName = leadingParty.party.name;
-                    const currentSeats = currentStats[partyName] || 0;
-                    const prevSeats = prevStats[partyName] || 0;
-                    const diff = (leadingParty.seatsWon) - prevSeats;
+                const previousElection = await this.prisma.election.findFirst({
+                    where: {
+                        year: { lt: currentElection.year },
+                        type: currentElection.type
+                    },
+                    orderBy: { year: 'desc' }
+                });
+                if (previousElection) {
+                    const currentVoteShare = await this.prisma.partyVoteSummary.aggregate({
+                        where: {
+                            partyId: leadingParty.partyId,
+                            summary: {
+                                electionId: targetElectionId,
+                                geoUnit: { level: 'CONSTITUENCY' }
+                            }
+                        },
+                        _avg: { voteSharePercent: true }
+                    });
+                    const previousVoteShare = await this.prisma.partyVoteSummary.aggregate({
+                        where: {
+                            partyId: leadingParty.partyId,
+                            summary: {
+                                electionId: previousElection.id,
+                                geoUnit: { level: 'CONSTITUENCY' }
+                            }
+                        },
+                        _avg: { voteSharePercent: true }
+                    });
+                    const currentShare = currentVoteShare._avg.voteSharePercent || 0;
+                    const previousShare = previousVoteShare._avg.voteSharePercent || 0;
+                    const diff = currentShare - previousShare;
                     const sign = diff > 0 ? "+" : "";
-                    swing = `${sign}${diff} Seats`;
+                    swing = `${sign}${diff.toFixed(2)}% Vote Share`;
                 }
             }
         }
         catch (e) {
+            this.logger.error('Error calculating swing:', e);
         }
         const result = {
             totalConstituencies,
@@ -144,16 +166,28 @@ let DashboardService = DashboardService_1 = class DashboardService {
             return cached;
         const elections = await this.prisma.election.findMany({
             orderBy: { year: 'asc' },
-            include: { seatSummaries: { include: { party: true } } }
+            include: {
+                seatSummaries: {
+                    include: { party: true }
+                }
+            }
         });
-        const result = elections.map(e => {
+        const partyColors = {};
+        const stats = elections.map(e => {
             const entry = { year: e.year.toString() };
             e.seatSummaries.forEach(s => {
-                const partyCode = s.party.symbol ? s.party.name : s.party.name;
-                entry[partyCode] = s.seatsWon;
+                const partyName = s.party.name;
+                entry[partyName] = s.seatsWon;
+                if (!partyColors[partyName]) {
+                    partyColors[partyName] = s.party.colorHex || '#ccc';
+                }
             });
             return entry;
         });
+        const result = {
+            stats,
+            colors: partyColors
+        };
         await this.cacheService.set(cacheKey, result, 3600);
         return result;
     }

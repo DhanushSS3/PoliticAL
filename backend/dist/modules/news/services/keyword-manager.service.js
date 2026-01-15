@@ -55,7 +55,7 @@ let KeywordManagerService = KeywordManagerService_1 = class KeywordManagerServic
         const entityClause = keywords.map((k) => `"${k.keyword}"`).join(" OR ");
         const contextTerms = [
             "election",
-            "pulls",
+            "polls",
             "vote",
             "campaign",
             "protest",

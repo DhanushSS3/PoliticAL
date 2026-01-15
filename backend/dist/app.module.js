@@ -26,6 +26,7 @@ const news_module_1 = require("./modules/news/news.module");
 const common_module_1 = require("./common/common.module");
 const dashboard_module_1 = require("./modules/dashboard/dashboard.module");
 const constituencies_module_1 = require("./modules/dashboard/constituencies.module");
+const news_intelligence_module_1 = require("./modules/news-intelligence/news-intelligence.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -50,6 +51,7 @@ exports.AppModule = AppModule = __decorate([
             common_module_1.CommonModule,
             dashboard_module_1.DashboardModule,
             constituencies_module_1.ConstituenciesModule,
+            news_intelligence_module_1.NewsIntelligenceModule,
         ],
     })
 ], AppModule);

@@ -13,16 +13,56 @@ export class NewsIntelligenceService {
     ) { }
 
     /**
+     * Resolve a geo unit identifier (ID or Name) to a numeric ID
+     */
+    private async resolveGeoUnitId(identifier?: string | number): Promise<number | null> {
+        if (!identifier || identifier === 'all') return null;
+
+        // 1. If it's already a number or numeric string
+        const numericId = typeof identifier === 'number' ? identifier : parseInt(identifier);
+        if (!isNaN(numericId)) return numericId;
+
+        // 2. Resolve by name
+        const name = identifier.toString();
+
+        // Check cache first for name resolution
+        const cacheKey = `geo-resolve:${name.toLowerCase()}`;
+        const cachedId = await this.cacheService.get<number>(cacheKey);
+        if (cachedId) return cachedId;
+
+        // Try exact match or partial match
+        const unit = await this.prisma.geoUnit.findFirst({
+            where: {
+                OR: [
+                    { name: { contains: name, mode: 'insensitive' } },
+                    { code: { contains: name, mode: 'insensitive' } }
+                ]
+            },
+            select: { id: true }
+        });
+
+        if (unit) {
+            await this.cacheService.set(cacheKey, unit.id, 86400); // Cache resolution for 24h
+            return unit.id;
+        }
+
+        return null;
+    }
+
+    /**
      * Get projected winner for a constituency using rule-based prediction
      */
-    async getProjectedWinner(constituencyId: number) {
-        const cacheKey = `news-intel:winner:${constituencyId}`;
+    async getProjectedWinner(geoUnitId: string | number) {
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+        if (!resolvedId) return null;
+
+        const cacheKey = `news-intel:winner:${resolvedId}`;
         const cached = await this.cacheService.get(cacheKey);
         if (cached) return cached;
 
         // 1. Get candidates in constituency
         const candidates = await this.prisma.candidateProfile.findMany({
-            where: { primaryGeoUnitId: constituencyId },
+            where: { primaryGeoUnitId: resolvedId },
             include: {
                 candidate: { include: { party: true } },
                 geoUnit: true,
@@ -39,7 +79,7 @@ export class NewsIntelligenceService {
 
         // 2. Get last election result
         const lastElection = await this.prisma.geoElectionSummary.findFirst({
-            where: { geoUnitId: constituencyId },
+            where: { geoUnitId: resolvedId },
             orderBy: { election: { year: 'desc' } },
             include: { election: true, partyResults: true },
         });
@@ -101,7 +141,10 @@ export class NewsIntelligenceService {
         predictions.sort((a, b) => b.winProbability - a.winProbability);
 
         const result = {
-            projectedWinner: predictions[0] || null,
+            candidateName: predictions[0]?.name || 'N/A',
+            partyName: predictions[0]?.party || 'N/A',
+            probability: (predictions[0]?.winProbability || 0) / 100,
+            reasoning: predictions[0]?.sentimentTrend === 'up' ? 'Rising positive sentiment' : 'Stable support base',
             allCandidates: predictions,
             lastUpdated: new Date().toISOString(),
         };
@@ -116,11 +159,14 @@ export class NewsIntelligenceService {
      * Get recent controversies for a constituency
      */
     async getControversies(
-        constituencyId: number,
+        geoUnitId: string | number,
         days: number = 7,
         limit: number = 5,
     ) {
-        const cacheKey = `news-intel:controversies:${constituencyId}:${days}`;
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+        if (!resolvedId) return [];
+
+        const cacheKey = `news-intel:controversies:${resolvedId}:${days}`;
         const cached = await this.cacheService.get(cacheKey);
         if (cached) return cached;
 
@@ -134,7 +180,7 @@ export class NewsIntelligenceService {
                 entityMentions: {
                     some: {
                         entityType: EntityType.GEO_UNIT,
-                        entityId: constituencyId,
+                        entityId: resolvedId,
                     },
                 },
             },
@@ -142,11 +188,7 @@ export class NewsIntelligenceService {
                 sentimentSignals: {
                     where: { sentiment: SentimentLabel.NEGATIVE },
                 },
-                entityMentions: {
-                    include: {
-                        // We'll extract entities in the map
-                    },
-                },
+                entityMentions: true,
             },
             orderBy: { publishedAt: 'desc' },
             take: limit * 3, // Fetch more, filter later
@@ -157,26 +199,24 @@ export class NewsIntelligenceService {
             .filter((a) => a.sentimentSignals.length > 0)
             .map((a) => ({
                 id: a.id,
-                title: a.title,
+                description: a.title,
                 summary: a.summary,
+                type: 'Negative Coverage',
                 sentiment: 'negative' as const,
                 impactScore: Math.round(
                     Math.abs(a.sentimentSignals[0].sentimentScore) * 100,
                 ),
                 timestamp: this.formatRelativeTime(a.publishedAt),
+                date: a.publishedAt.toISOString(),
                 sourceUrl: a.sourceUrl,
-                relatedCandidates: [], // TODO: Extract from entityMentions
-                relatedParties: [],
             }))
             .sort((a, b) => b.impactScore - a.impactScore)
             .slice(0, limit);
 
-        const result = { controversies };
-
         // Cache for 15 minutes
-        await this.cacheService.set(cacheKey, result, 900);
+        await this.cacheService.set(cacheKey, controversies, 900);
 
-        return result;
+        return controversies;
     }
 
     /**
@@ -216,8 +256,11 @@ export class NewsIntelligenceService {
     /**
      * Get news impact analysis for a geo unit
      */
-    async getNewsImpact(geoUnitId: number, days: number = 7) {
-        const cacheKey = `news-intel:impact:${geoUnitId}:${days}`;
+    async getNewsImpact(geoUnitId: string | number, days: number = 7) {
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+        if (!resolvedId) return null;
+
+        const cacheKey = `news-intel:impact:${resolvedId}:${days}`;
         const cached = await this.cacheService.get(cacheKey);
         if (cached) return cached;
 
@@ -231,7 +274,7 @@ export class NewsIntelligenceService {
                 entityMentions: {
                     some: {
                         entityType: EntityType.GEO_UNIT,
-                        entityId: geoUnitId,
+                        entityId: resolvedId,
                     },
                 },
             },
@@ -281,11 +324,13 @@ export class NewsIntelligenceService {
      * Get live news feed
      */
     async getLiveFeed(
-        geoUnitId?: number,
+        geoUnitId?: string | number,
         partyId?: number,
         limit: number = 20,
     ) {
-        const cacheKey = `news-intel:feed:${geoUnitId || 'all'}:${partyId || 'all'}:${limit}`;
+        const resolvedId = geoUnitId ? await this.resolveGeoUnitId(geoUnitId) : null;
+
+        const cacheKey = `news-intel:feed:${resolvedId || 'all'}:${partyId || 'all'}:${limit}`;
         const cached = await this.cacheService.get(cacheKey);
         if (cached) return cached;
 
@@ -294,12 +339,12 @@ export class NewsIntelligenceService {
             publishedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         };
 
-        if (geoUnitId || partyId) {
+        if (resolvedId || partyId) {
             where.entityMentions = { some: { OR: [] } };
-            if (geoUnitId)
+            if (resolvedId)
                 where.entityMentions.some.OR.push({
                     entityType: EntityType.GEO_UNIT,
-                    entityId: geoUnitId,
+                    entityId: resolvedId,
                 });
             if (partyId)
                 where.entityMentions.some.OR.push({
@@ -318,26 +363,23 @@ export class NewsIntelligenceService {
             take: limit,
         });
 
-        const result = {
-            news: articles.map((a) => ({
-                id: a.id,
-                headline: a.title,
-                summary: a.summary,
-                party: 'N/A', // TODO: Extract
-                sentiment: a.sentimentSignals[0]?.sentiment.toLowerCase() || 'neutral',
-                virality: this.calculateVirality(a),
-                timestamp: this.formatRelativeTime(a.publishedAt),
-                url: a.sourceUrl,
-                impactScore: Math.round(
-                    Math.abs(a.sentimentSignals[0]?.sentimentScore || 0) * 100,
-                ),
-                relatedEntities: {
-                    candidates: [],
-                    parties: [],
-                },
-            })),
-            lastUpdated: new Date().toISOString(),
-        };
+        const result = articles.map((a) => ({
+            id: a.id,
+            headline: a.title,
+            summary: a.summary,
+            party: 'N/A', // TODO: Extract
+            sentiment: a.sentimentSignals[0]?.sentiment.toLowerCase() || 'neutral',
+            virality: this.calculateVirality(a),
+            timestamp: this.formatRelativeTime(a.publishedAt),
+            url: a.sourceUrl,
+            impactScore: Math.round(
+                Math.abs(a.sentimentSignals[0]?.sentimentScore || 0) * 100,
+            ),
+            relatedEntities: {
+                candidates: [],
+                parties: [],
+            },
+        }));
 
         // Cache for 5 minutes
         await this.cacheService.set(cacheKey, result, 300);

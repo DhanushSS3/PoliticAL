@@ -52,17 +52,18 @@ let NewsIngestionService = NewsIngestionService_1 = class NewsIngestionService {
         this.logger.log(`Active breakdown: ${byType.CANDIDATE} candidates, ${byType.PARTY} parties, ${byType.GEO_UNIT} geo units`);
         for (const entity of activeEntities) {
             await this.fetchNewsForEntity(entity.entityType, entity.entityId);
+            await new Promise((resolve) => setTimeout(resolve, 1500));
         }
         this.logger.log(`✅ Ingestion job completed. Started at ${jobStart.toISOString()}, active entities: ${activeEntities.length}`);
     }
-    async fetchNewsForEntity(entityType, entityId) {
+    async fetchNewsForEntity(entityType, entityId, retryCount = 0) {
         try {
             const query = await this.keywordManager.buildSearchQuery(entityType, entityId);
             if (!query) {
                 return;
             }
             this.logger.debug(`Fetching news for ${entityType} #${entityId} using query: ${query}`);
-            const encodedQuery = encodeURIComponent(query + " when:1d");
+            const encodedQuery = encodeURIComponent(query + " sort:newest");
             const feedUrl = `${this.GOOGLE_NEWS_BASE_URL}${encodedQuery}&hl=en-IN&gl=IN&ceid=IN:en`;
             const feed = await this.parser.parseURL(feedUrl);
             for (const item of feed.items) {
@@ -70,6 +71,11 @@ let NewsIngestionService = NewsIngestionService_1 = class NewsIngestionService {
             }
         }
         catch (error) {
+            if (retryCount < 2 && error.message.includes("503")) {
+                this.logger.warn(`Rate limited (503) for ${entityType} #${entityId}. Retrying in 5s...`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                return this.fetchNewsForEntity(entityType, entityId, retryCount + 1);
+            }
             this.logger.error(`Failed to fetch news for ${entityType} #${entityId}: ${error.message}`);
         }
     }

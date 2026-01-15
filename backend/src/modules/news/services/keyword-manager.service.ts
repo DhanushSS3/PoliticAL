@@ -76,7 +76,7 @@ export class KeywordManagerService {
     // Standard political context terms (hardcoded vocabulary for stability)
     const contextTerms = [
       "election",
-      "pulls",
+      "polls",
       "vote",
       "campaign",
       "protest",

@@ -1,4 +1,5 @@
 import { Controller, Get, Query, ParseIntPipe } from '@nestjs/common';
+// News Intelligence Controller handling election projections and sentiment analysis
 import { NewsIntelligenceService } from './news-intelligence.service';
 
 @Controller('v1/news-intelligence')
@@ -7,19 +8,19 @@ export class NewsIntelligenceController {
 
     @Get('projected-winner')
     async getProjectedWinner(
-        @Query('constituencyId', ParseIntPipe) constituencyId: number,
+        @Query('geoUnitId') geoUnitId: string,
     ) {
-        return this.newsIntelligenceService.getProjectedWinner(constituencyId);
+        return this.newsIntelligenceService.getProjectedWinner(geoUnitId);
     }
 
     @Get('controversies')
     async getControversies(
-        @Query('constituencyId', ParseIntPipe) constituencyId: number,
+        @Query('geoUnitId') geoUnitId: string,
         @Query('days', new ParseIntPipe({ optional: true })) days?: number,
         @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     ) {
         return this.newsIntelligenceService.getControversies(
-            constituencyId,
+            geoUnitId,
             days || 7,
             limit || 5,
         );
@@ -40,7 +41,7 @@ export class NewsIntelligenceController {
 
     @Get('news-impact')
     async getNewsImpact(
-        @Query('geoUnitId', ParseIntPipe) geoUnitId: number,
+        @Query('geoUnitId') geoUnitId: string,
         @Query('days', new ParseIntPipe({ optional: true })) days?: number,
     ) {
         return this.newsIntelligenceService.getNewsImpact(geoUnitId, days || 7);
@@ -48,7 +49,7 @@ export class NewsIntelligenceController {
 
     @Get('live-feed')
     async getLiveFeed(
-        @Query('geoUnitId', new ParseIntPipe({ optional: true })) geoUnitId?: number,
+        @Query('geoUnitId') geoUnitId?: string,
         @Query('partyId', new ParseIntPipe({ optional: true })) partyId?: number,
         @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     ) {

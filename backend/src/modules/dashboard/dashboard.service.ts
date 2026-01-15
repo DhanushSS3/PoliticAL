@@ -78,37 +78,58 @@ export class DashboardService {
         const leadingParty = partySeats[0];
         const oppositionParty = partySeats[1];
 
-        // Calculate Swing (Seat Change for Leading Party)
+        // Calculate Swing (Vote Share Change for Leading Party from last election)
         let swing = null;
         try {
-            const history = await this.getHistoricalStats() as any[];
-            // Find current election year from ID
             const currentElection = await this.prisma.election.findUnique({
                 where: { id: targetElectionId }
             });
 
             if (currentElection && leadingParty) {
-                // Sort history by year just in case
-                const sortedHistory = history.sort((a: any, b: any) => parseInt(a.year) - parseInt(b.year));
-                const currentIndex = sortedHistory.findIndex((h: any) => h.year == currentElection.year);
+                // Get previous election
+                const previousElection = await this.prisma.election.findFirst({
+                    where: {
+                        year: { lt: currentElection.year },
+                        type: currentElection.type
+                    },
+                    orderBy: { year: 'desc' }
+                });
 
-                if (currentIndex > 0) {
-                    const currentStats = sortedHistory[currentIndex];
-                    const prevStats = sortedHistory[currentIndex - 1];
-                    const partyName = leadingParty.party.name; // e.g. "INC"
+                if (previousElection) {
+                    // Get current vote share for winning party
+                    const currentVoteShare = await this.prisma.partyVoteSummary.aggregate({
+                        where: {
+                            partyId: leadingParty.partyId,
+                            summary: {
+                                electionId: targetElectionId,
+                                geoUnit: { level: 'CONSTITUENCY' }
+                            }
+                        },
+                        _avg: { voteSharePercent: true }
+                    });
 
-                    // Historical stats keys are party names
-                    const currentSeats = currentStats[partyName] || 0;
-                    const prevSeats = prevStats[partyName] || 0;
-                    // If currentStats has logic different from partySeatSummary, use what we have in hand (partySeats[0].seatsWon)
-                    // But assume historical covers it.
+                    // Get previous vote share for winning party
+                    const previousVoteShare = await this.prisma.partyVoteSummary.aggregate({
+                        where: {
+                            partyId: leadingParty.partyId,
+                            summary: {
+                                electionId: previousElection.id,
+                                geoUnit: { level: 'CONSTITUENCY' }
+                            }
+                        },
+                        _avg: { voteSharePercent: true }
+                    });
 
-                    const diff = (leadingParty.seatsWon) - prevSeats; // Use actual current seats
+                    const currentShare = currentVoteShare._avg.voteSharePercent || 0;
+                    const previousShare = previousVoteShare._avg.voteSharePercent || 0;
+                    const diff = currentShare - previousShare;
+
                     const sign = diff > 0 ? "+" : "";
-                    swing = `${sign}${diff} Seats`; // e.g. "+55 Seats"
+                    swing = `${sign}${diff.toFixed(2)}% Vote Share`; // e.g. "+5.23% Vote Share"
                 }
             }
         } catch (e) {
+            this.logger.error('Error calculating swing:', e);
             // Ignore swing calc errors
         }
 
@@ -161,19 +182,34 @@ export class DashboardService {
 
         const elections = await this.prisma.election.findMany({
             orderBy: { year: 'asc' },
-            include: { seatSummaries: { include: { party: true } } }
+            include: {
+                seatSummaries: {
+                    include: { party: true }
+                }
+            }
         });
 
+        const partyColors: Record<string, string> = {};
+
         // Transform into { year: "2013", INC: 122, BJP: 40... }
-        const result = elections.map(e => {
+        const stats = elections.map(e => {
             const entry: any = { year: e.year.toString() };
             e.seatSummaries.forEach(s => {
-                const partyCode = s.party.symbol ? s.party.name : s.party.name;
-                // Using name for consistency with frontend expectations (INC, BJP)
-                entry[partyCode] = s.seatsWon;
+                const partyName = s.party.name;
+                entry[partyName] = s.seatsWon;
+
+                // Capture color for the party
+                if (!partyColors[partyName]) {
+                    partyColors[partyName] = s.party.colorHex || '#ccc';
+                }
             });
             return entry;
         });
+
+        const result = {
+            stats,
+            colors: partyColors
+        };
 
         await this.cacheService.set(cacheKey, result, 3600);
         return result;

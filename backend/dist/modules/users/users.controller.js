@@ -8,18 +8,65 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsersController = void 0;
 const common_1 = require("@nestjs/common");
 const users_service_1 = require("./users.service");
+const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 let UsersController = class UsersController {
     constructor(usersService) {
         this.usersService = usersService;
     }
+    async getProfile(req) {
+        return this.usersService.getProfile(req.user.userId);
+    }
+    async updateProfile(req, body) {
+        return this.usersService.updateProfile(req.user.userId, body);
+    }
+    async updateOpponent(req, body) {
+        return this.usersService.updateOpponent(req.user.userId, body.opponentId);
+    }
+    async getOpponentCandidates(req) {
+        return this.usersService.getOpponentCandidates(req.user.userId);
+    }
 };
 exports.UsersController = UsersController;
+__decorate([
+    (0, common_1.Get)("profile"),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "getProfile", null);
+__decorate([
+    (0, common_1.Patch)("profile"),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "updateProfile", null);
+__decorate([
+    (0, common_1.Patch)("opponent"),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "updateOpponent", null);
+__decorate([
+    (0, common_1.Get)("opponents"),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "getOpponentCandidates", null);
 exports.UsersController = UsersController = __decorate([
-    (0, common_1.Controller)("users"),
+    (0, common_1.Controller)("v1/users"),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __metadata("design:paramtypes", [users_service_1.UsersService])
 ], UsersController);
 //# sourceMappingURL=users.controller.js.map

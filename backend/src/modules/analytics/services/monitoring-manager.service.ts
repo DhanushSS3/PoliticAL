@@ -96,11 +96,17 @@ export class MonitoringManagerService {
         }
 
         // 2. Mark candidate profile as subscribed
+        // Fetch the user's subscription to link it
+        const subscription = userId ? await this.prisma.subscription.findUnique({
+            where: { userId }
+        }) : null;
+
         await this.prisma.candidateProfile.update({
             where: { candidateId },
             data: {
                 isSubscribed: true,
                 userId,
+                subscriptionId: subscription?.id,
                 monitoringStartedAt: new Date(),
             },
         });

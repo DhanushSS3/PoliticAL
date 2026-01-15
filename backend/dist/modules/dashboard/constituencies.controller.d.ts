@@ -30,13 +30,41 @@ export declare class ConstituenciesController {
         name: string;
         number: string;
     }[]>;
-    getDistrictDetails(district: string, electionId: string): Promise<{
-        constituencies: {
+    getDetails(constituencyId: string, electionId: string): Promise<{
+        id: number;
+        name: string;
+        code: string;
+        totalElectors: number;
+        turnout: number;
+        margin: number;
+        marginPercentage: number;
+        winner: {
             name: string;
-            sittingMLA: string;
             party: string;
-            margin: number;
-            defeatedBy: string;
+            partyColor: string;
+            votes: number;
+            votePercentage: number;
+        };
+        runnerUp: {
+            name: string;
+            party: string;
+            partyColor: string;
+            votes: number;
+            votePercentage: number;
+        };
+        risks: {
+            type: string;
+            severity: string;
+            description: string;
         }[];
     }>;
+    getOpponents(constituencyId: string): Promise<{
+        id: number;
+        name: string;
+        party: string;
+        partyColor: string;
+        votes: number;
+        age: number;
+        gender: string;
+    }[]>;
 }

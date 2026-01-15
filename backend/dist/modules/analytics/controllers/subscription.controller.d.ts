@@ -34,24 +34,28 @@ export declare class SubscriptionController {
         candidate: {
             id: number;
             fullName: string;
+            partyId: number;
             gender: string | null;
             age: number | null;
             category: string | null;
-            partyId: number;
         };
         profile: {
             userId: number | null;
             createdAt: Date;
             updatedAt: Date;
-            partyId: number;
             candidateId: number;
             primaryGeoUnitId: number;
+            partyId: number;
             isSelf: boolean;
             importanceWeight: number;
             isSubscribed: boolean;
             subscriptionId: number | null;
             monitoringStartedAt: Date | null;
             monitoringEndedAt: Date | null;
+            profilePhotoPath: string | null;
+            profileTextPath: string | null;
+            opponentProfilePhotoPath: string | null;
+            opponentProfileTextPath: string | null;
             opponentId: number | null;
         };
         success: boolean;

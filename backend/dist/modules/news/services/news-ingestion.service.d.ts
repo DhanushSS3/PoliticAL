@@ -11,6 +11,6 @@ export declare class NewsIngestionService {
     private readonly GOOGLE_NEWS_BASE_URL;
     constructor(prisma: PrismaService, keywordManager: KeywordManagerService, sentimentService: SentimentAnalysisService);
     fetchAllNews(): Promise<void>;
-    fetchNewsForEntity(entityType: EntityType, entityId: number): Promise<void>;
+    fetchNewsForEntity(entityType: EntityType, entityId: number, retryCount?: number): any;
     private processFeedItem;
 }

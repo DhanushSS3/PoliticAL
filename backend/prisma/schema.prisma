@@ -158,6 +158,7 @@ model Candidate {
   // Relations
   electionResultsRaw ElectionResultRaw[]
   profile            CandidateProfile?
+  opponentProfiles   CandidateProfile[] @relation("OpponentRelation")
 
   @@index([partyId])
 }
@@ -176,6 +177,12 @@ model CandidateProfile {
   monitoringStartedAt DateTime?
   monitoringEndedAt   DateTime?
   
+  // Profile assets (photos and text)
+  profilePhotoPath   String?  // Path to candidate's own profile photo
+  profileTextPath    String?  // Path to candidate's profile text/bio
+  opponentProfilePhotoPath String?  // Path to selected opponent's profile photo
+  opponentProfileTextPath  String?  // Path to selected opponent's profile text
+  
   // Opponent tracking for candidates
   opponentId         Int?
 
@@ -183,6 +190,7 @@ model CandidateProfile {
   user      User?     @relation(fields: [userId], references: [id])
   geoUnit   GeoUnit   @relation(fields: [primaryGeoUnitId], references: [id])
   party     Party     @relation(fields: [partyId], references: [id])
+  opponent  Candidate? @relation("OpponentRelation", fields: [opponentId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -414,12 +422,12 @@ model User {
 
   // Relations
   subscription Subscription?
+  candidateProfile CandidateProfile?
   alerts       Alert[]
   sessions     Session[]
   impersonatedSessions ImpersonationSession[] @relation("ImpersonatedUser")
   adminImpersonations  ImpersonationSession[] @relation("AdminImpersonator")
   passwordResetOtps    PasswordResetOtp[]
-  candidateProfile     CandidateProfile?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

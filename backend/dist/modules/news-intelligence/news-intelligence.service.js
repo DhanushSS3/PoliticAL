@@ -1,0 +1,385 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var NewsIntelligenceService_1;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.NewsIntelligenceService = void 0;
+const common_1 = require("@nestjs/common");
+const prisma_service_1 = require("../../prisma/prisma.service");
+const cache_service_1 = require("../../common/services/cache.service");
+const client_1 = require("@prisma/client");
+let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligenceService {
+    constructor(prisma, cacheService) {
+        this.prisma = prisma;
+        this.cacheService = cacheService;
+        this.logger = new common_1.Logger(NewsIntelligenceService_1.name);
+    }
+    async resolveGeoUnitId(identifier) {
+        if (!identifier || identifier === 'all')
+            return null;
+        const numericId = typeof identifier === 'number' ? identifier : parseInt(identifier);
+        if (!isNaN(numericId))
+            return numericId;
+        const name = identifier.toString();
+        const cacheKey = `geo-resolve:${name.toLowerCase()}`;
+        const cachedId = await this.cacheService.get(cacheKey);
+        if (cachedId)
+            return cachedId;
+        const unit = await this.prisma.geoUnit.findFirst({
+            where: {
+                OR: [
+                    { name: { contains: name, mode: 'insensitive' } },
+                    { code: { contains: name, mode: 'insensitive' } }
+                ]
+            },
+            select: { id: true }
+        });
+        if (unit) {
+            await this.cacheService.set(cacheKey, unit.id, 86400);
+            return unit.id;
+        }
+        return null;
+    }
+    async getProjectedWinner(geoUnitId) {
+        var _a, _b, _c, _d;
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+        if (!resolvedId)
+            return null;
+        const cacheKey = `news-intel:winner:${resolvedId}`;
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached)
+            return cached;
+        const candidates = await this.prisma.candidateProfile.findMany({
+            where: { primaryGeoUnitId: resolvedId },
+            include: {
+                candidate: { include: { party: true } },
+                geoUnit: true,
+            },
+        });
+        if (candidates.length === 0) {
+            return {
+                projectedWinner: null,
+                allCandidates: [],
+                lastUpdated: new Date().toISOString(),
+            };
+        }
+        const lastElection = await this.prisma.geoElectionSummary.findFirst({
+            where: { geoUnitId: resolvedId },
+            orderBy: { election: { year: 'desc' } },
+            include: { election: true, partyResults: true },
+        });
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const predictions = await Promise.all(candidates.map(async (profile) => {
+            const sentiments = await this.prisma.sentimentSignal.findMany({
+                where: {
+                    sourceEntityType: client_1.EntityType.CANDIDATE,
+                    sourceEntityId: profile.candidateId,
+                    createdAt: { gte: thirtyDaysAgo },
+                },
+            });
+            let score = 0;
+            if ((lastElection === null || lastElection === void 0 ? void 0 : lastElection.winningParty) === profile.candidate.party.name) {
+                score += 40;
+            }
+            const avgSentiment = sentiments.length > 0
+                ? sentiments.reduce((sum, s) => sum + s.sentimentScore, 0) /
+                    sentiments.length
+                : 0;
+            score += ((avgSentiment + 1) / 2) * 30;
+            const partyWave = await this.getPartyWave(profile.partyId);
+            score += partyWave * 20;
+            const isIncumbent = (lastElection === null || lastElection === void 0 ? void 0 : lastElection.winningParty) === profile.candidate.party.name;
+            const negativeRatio = sentiments.filter((s) => s.sentiment === client_1.SentimentLabel.NEGATIVE)
+                .length / (sentiments.length || 1);
+            if (isIncumbent && negativeRatio > 0.5) {
+                score -= 10;
+            }
+            return {
+                candidateId: profile.candidateId,
+                name: profile.candidate.fullName,
+                party: profile.candidate.party.name,
+                winProbability: Math.min(Math.max(score, 0), 100),
+                sentimentScore: `${avgSentiment > 0 ? '+' : ''}${(avgSentiment * 100).toFixed(0)}%`,
+                sentimentTrend: this.calculateTrend(sentiments),
+            };
+        }));
+        predictions.sort((a, b) => b.winProbability - a.winProbability);
+        const result = {
+            candidateName: ((_a = predictions[0]) === null || _a === void 0 ? void 0 : _a.name) || 'N/A',
+            partyName: ((_b = predictions[0]) === null || _b === void 0 ? void 0 : _b.party) || 'N/A',
+            probability: (((_c = predictions[0]) === null || _c === void 0 ? void 0 : _c.winProbability) || 0) / 100,
+            reasoning: ((_d = predictions[0]) === null || _d === void 0 ? void 0 : _d.sentimentTrend) === 'up' ? 'Rising positive sentiment' : 'Stable support base',
+            allCandidates: predictions,
+            lastUpdated: new Date().toISOString(),
+        };
+        await this.cacheService.set(cacheKey, result, 3600);
+        return result;
+    }
+    async getControversies(geoUnitId, days = 7, limit = 5) {
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+        if (!resolvedId)
+            return [];
+        const cacheKey = `news-intel:controversies:${resolvedId}:${days}`;
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached)
+            return cached;
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const articles = await this.prisma.newsArticle.findMany({
+            where: {
+                publishedAt: { gte: cutoff },
+                status: 'APPROVED',
+                entityMentions: {
+                    some: {
+                        entityType: client_1.EntityType.GEO_UNIT,
+                        entityId: resolvedId,
+                    },
+                },
+            },
+            include: {
+                sentimentSignals: {
+                    where: { sentiment: client_1.SentimentLabel.NEGATIVE },
+                },
+                entityMentions: true,
+            },
+            orderBy: { publishedAt: 'desc' },
+            take: limit * 3,
+        });
+        const controversies = articles
+            .filter((a) => a.sentimentSignals.length > 0)
+            .map((a) => ({
+            id: a.id,
+            description: a.title,
+            summary: a.summary,
+            type: 'Negative Coverage',
+            sentiment: 'negative',
+            impactScore: Math.round(Math.abs(a.sentimentSignals[0].sentimentScore) * 100),
+            timestamp: this.formatRelativeTime(a.publishedAt),
+            date: a.publishedAt.toISOString(),
+            sourceUrl: a.sourceUrl,
+        }))
+            .sort((a, b) => b.impactScore - a.impactScore)
+            .slice(0, limit);
+        await this.cacheService.set(cacheKey, controversies, 900);
+        return controversies;
+    }
+    async getHeadToHead(candidate1Id, candidate2Id, days = 30) {
+        const cacheKey = `news-intel:h2h:${candidate1Id}:${candidate2Id}:${days}`;
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached)
+            return cached;
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const [c1, c2] = await Promise.all([
+            this.getCandidateSentiment(candidate1Id, cutoff),
+            this.getCandidateSentiment(candidate2Id, cutoff),
+        ]);
+        const sentimentTrend = [];
+        const result = {
+            candidate1: c1,
+            candidate2: c2,
+            sentimentTrend,
+        };
+        await this.cacheService.set(cacheKey, result, 1800);
+        return result;
+    }
+    async getNewsImpact(geoUnitId, days = 7) {
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+        if (!resolvedId)
+            return null;
+        const cacheKey = `news-intel:impact:${resolvedId}:${days}`;
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached)
+            return cached;
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const articles = await this.prisma.newsArticle.findMany({
+            where: {
+                publishedAt: { gte: cutoff },
+                status: 'APPROVED',
+                entityMentions: {
+                    some: {
+                        entityType: client_1.EntityType.GEO_UNIT,
+                        entityId: resolvedId,
+                    },
+                },
+            },
+            include: {
+                sentimentSignals: true,
+                entityMentions: true,
+            },
+            orderBy: { publishedAt: 'desc' },
+            take: 50,
+        });
+        const headlines = articles.slice(0, 20).map((a) => {
+            var _a;
+            return ({
+                id: a.id,
+                headline: a.title,
+                summary: a.summary,
+                sentiment: ((_a = a.sentimentSignals[0]) === null || _a === void 0 ? void 0 : _a.sentiment.toLowerCase()) || 'neutral',
+                party: 'N/A',
+                timestamp: this.formatRelativeTime(a.publishedAt),
+                url: a.sourceUrl,
+                virality: this.calculateVirality(a),
+            });
+        });
+        const result = {
+            impactTopics: [],
+            headlines,
+            sentimentDistribution: {
+                positive: articles.filter((a) => a.sentimentSignals.some((s) => s.sentiment === client_1.SentimentLabel.POSITIVE)).length,
+                negative: articles.filter((a) => a.sentimentSignals.some((s) => s.sentiment === client_1.SentimentLabel.NEGATIVE)).length,
+                neutral: articles.filter((a) => a.sentimentSignals.some((s) => s.sentiment === client_1.SentimentLabel.NEUTRAL)).length,
+            },
+        };
+        await this.cacheService.set(cacheKey, result, 600);
+        return result;
+    }
+    async getLiveFeed(geoUnitId, partyId, limit = 20) {
+        const resolvedId = geoUnitId ? await this.resolveGeoUnitId(geoUnitId) : null;
+        const cacheKey = `news-intel:feed:${resolvedId || 'all'}:${partyId || 'all'}:${limit}`;
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached)
+            return cached;
+        const where = {
+            status: 'APPROVED',
+            publishedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        };
+        if (resolvedId || partyId) {
+            where.entityMentions = { some: { OR: [] } };
+            if (resolvedId)
+                where.entityMentions.some.OR.push({
+                    entityType: client_1.EntityType.GEO_UNIT,
+                    entityId: resolvedId,
+                });
+            if (partyId)
+                where.entityMentions.some.OR.push({
+                    entityType: client_1.EntityType.PARTY,
+                    entityId: partyId,
+                });
+        }
+        const articles = await this.prisma.newsArticle.findMany({
+            where,
+            include: {
+                sentimentSignals: true,
+                entityMentions: true,
+            },
+            orderBy: { publishedAt: 'desc' },
+            take: limit,
+        });
+        const result = articles.map((a) => {
+            var _a, _b;
+            return ({
+                id: a.id,
+                headline: a.title,
+                summary: a.summary,
+                party: 'N/A',
+                sentiment: ((_a = a.sentimentSignals[0]) === null || _a === void 0 ? void 0 : _a.sentiment.toLowerCase()) || 'neutral',
+                virality: this.calculateVirality(a),
+                timestamp: this.formatRelativeTime(a.publishedAt),
+                url: a.sourceUrl,
+                impactScore: Math.round(Math.abs(((_b = a.sentimentSignals[0]) === null || _b === void 0 ? void 0 : _b.sentimentScore) || 0) * 100),
+                relatedEntities: {
+                    candidates: [],
+                    parties: [],
+                },
+            });
+        });
+        await this.cacheService.set(cacheKey, result, 300);
+        return result;
+    }
+    async getPartyWave(partyId) {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const stateSentiments = await this.prisma.sentimentSignal.findMany({
+            where: {
+                sourceEntityType: client_1.EntityType.PARTY,
+                sourceEntityId: partyId,
+                createdAt: { gte: thirtyDaysAgo },
+            },
+        });
+        const avgScore = stateSentiments.length > 0
+            ? stateSentiments.reduce((sum, s) => sum + s.sentimentScore, 0) /
+                stateSentiments.length
+            : 0;
+        return (avgScore + 1) / 2;
+    }
+    calculateTrend(sentiments) {
+        if (sentiments.length < 2)
+            return 'stable';
+        const sorted = sentiments.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+        const firstHalf = sorted.slice(0, Math.floor(sorted.length / 2));
+        const secondHalf = sorted.slice(Math.floor(sorted.length / 2));
+        const avgFirst = firstHalf.reduce((sum, s) => sum + s.sentimentScore, 0) /
+            firstHalf.length;
+        const avgSecond = secondHalf.reduce((sum, s) => sum + s.sentimentScore, 0) /
+            secondHalf.length;
+        if (avgSecond > avgFirst + 0.1)
+            return 'up';
+        if (avgSecond < avgFirst - 0.1)
+            return 'down';
+        return 'stable';
+    }
+    async getCandidateSentiment(candidateId, since) {
+        const candidate = await this.prisma.candidate.findUnique({
+            where: { id: candidateId },
+            include: { party: true },
+        });
+        const sentiments = await this.prisma.sentimentSignal.findMany({
+            where: {
+                sourceEntityType: client_1.EntityType.CANDIDATE,
+                sourceEntityId: candidateId,
+                createdAt: { gte: since },
+            },
+        });
+        const positive = sentiments.filter((s) => s.sentiment === client_1.SentimentLabel.POSITIVE).length;
+        const negative = sentiments.filter((s) => s.sentiment === client_1.SentimentLabel.NEGATIVE).length;
+        const neutral = sentiments.filter((s) => s.sentiment === client_1.SentimentLabel.NEUTRAL).length;
+        const total = sentiments.length || 1;
+        return {
+            candidateId,
+            name: candidate.fullName,
+            party: candidate.party.name,
+            positive: Math.round((positive / total) * 100),
+            negative: Math.round((negative / total) * 100),
+            neutral: Math.round((neutral / total) * 100),
+            netSentiment: Math.round(((positive - negative) / total) * 100),
+            articleCount: total,
+        };
+    }
+    formatRelativeTime(date) {
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        if (diffMins < 60)
+            return `${diffMins}m ago`;
+        if (diffHours < 24)
+            return `${diffHours}h ago`;
+        return `${diffDays}d ago`;
+    }
+    calculateVirality(article) {
+        var _a;
+        const mentionCount = ((_a = article.entityMentions) === null || _a === void 0 ? void 0 : _a.length) || 0;
+        const hoursSincePublished = (Date.now() - article.publishedAt.getTime()) / (1000 * 60 * 60);
+        if (hoursSincePublished <= 24) {
+            if (mentionCount >= 10)
+                return 'VIRAL';
+            if (mentionCount >= 5)
+                return 'TRENDING';
+        }
+        return null;
+    }
+};
+exports.NewsIntelligenceService = NewsIntelligenceService;
+exports.NewsIntelligenceService = NewsIntelligenceService = NewsIntelligenceService_1 = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        cache_service_1.CacheService])
+], NewsIntelligenceService);
+//# sourceMappingURL=news-intelligence.service.js.map

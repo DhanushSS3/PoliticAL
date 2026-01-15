@@ -18,7 +18,7 @@ export class NewsIngestionService {
     private prisma: PrismaService,
     private keywordManager: KeywordManagerService,
     private sentimentService: SentimentAnalysisService,
-  ) {}
+  ) { }
 
   /**
    * Main job entry point: Fetch news for ACTIVELY MONITORED entities only
@@ -76,6 +76,8 @@ export class NewsIngestionService {
     // Fetch news for each active entity
     for (const entity of activeEntities) {
       await this.fetchNewsForEntity(entity.entityType, entity.entityId);
+      // Wait 1-2 seconds between entities to avoid rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
     this.logger.log(
@@ -86,7 +88,7 @@ export class NewsIngestionService {
   /**
    * Fetch news for a specific entity using its keywords
    */
-  async fetchNewsForEntity(entityType: EntityType, entityId: number) {
+  async fetchNewsForEntity(entityType: EntityType, entityId: number, retryCount = 0) {
     try {
       // 1. Build Query
       const query = await this.keywordManager.buildSearchQuery(
@@ -102,7 +104,7 @@ export class NewsIngestionService {
       );
 
       // 2. Fetch RSS Feed
-      const encodedQuery = encodeURIComponent(query + " when:1d");
+      const encodedQuery = encodeURIComponent(query + " sort:newest");
       const feedUrl = `${this.GOOGLE_NEWS_BASE_URL}${encodedQuery}&hl=en-IN&gl=IN&ceid=IN:en`;
 
       const feed = await this.parser.parseURL(feedUrl);
@@ -112,6 +114,13 @@ export class NewsIngestionService {
         await this.processFeedItem(item, entityType, entityId);
       }
     } catch (error) {
+      // Retry for 503 or transient errors
+      if (retryCount < 2 && error.message.includes("503")) {
+        this.logger.warn(`Rate limited (503) for ${entityType} #${entityId}. Retrying in 5s...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        return this.fetchNewsForEntity(entityType, entityId, retryCount + 1);
+      }
+
       this.logger.error(
         `Failed to fetch news for ${entityType} #${entityId}: ${error.message}`,
       );

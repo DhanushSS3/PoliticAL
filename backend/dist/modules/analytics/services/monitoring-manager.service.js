@@ -55,11 +55,15 @@ let MonitoringManagerService = MonitoringManagerService_1 = class MonitoringMana
                 }
             });
         }
+        const subscription = userId ? await this.prisma.subscription.findUnique({
+            where: { userId }
+        }) : null;
         await this.prisma.candidateProfile.update({
             where: { candidateId },
             data: {
                 isSubscribed: true,
                 userId,
+                subscriptionId: subscription === null || subscription === void 0 ? void 0 : subscription.id,
                 monitoringStartedAt: new Date(),
             },
         });

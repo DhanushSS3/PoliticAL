@@ -10,13 +10,16 @@ exports.ConstituenciesModule = void 0;
 const common_1 = require("@nestjs/common");
 const constituencies_controller_1 = require("./constituencies.controller");
 const constituencies_service_1 = require("./constituencies.service");
+const candidate_settings_controller_1 = require("./candidate-settings.controller");
+const candidate_settings_service_1 = require("./candidate-settings.service");
 let ConstituenciesModule = class ConstituenciesModule {
 };
 exports.ConstituenciesModule = ConstituenciesModule;
 exports.ConstituenciesModule = ConstituenciesModule = __decorate([
     (0, common_1.Module)({
-        controllers: [constituencies_controller_1.ConstituenciesController],
-        providers: [constituencies_service_1.ConstituenciesService],
+        controllers: [constituencies_controller_1.ConstituenciesController, candidate_settings_controller_1.CandidateSettingsController],
+        providers: [constituencies_service_1.ConstituenciesService, candidate_settings_service_1.CandidateSettingsService],
+        exports: [candidate_settings_service_1.CandidateSettingsService],
     })
 ], ConstituenciesModule);
 //# sourceMappingURL=constituencies.module.js.map

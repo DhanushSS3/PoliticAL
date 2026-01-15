@@ -22,11 +22,16 @@ export class ConstituenciesController {
         return this.constituenciesService.getSubscribed(parseInt(userId));
     }
 
-    @Get('district-details')
-    async getDistrictDetails(
-        @Query('district') district: string,
+    @Get('details')
+    async getDetails(
+        @Query('constituencyId') constituencyId: string,
         @Query('electionId') electionId: string
     ) {
-        return this.constituenciesService.getDistrictDetails(district, electionId);
+        return this.constituenciesService.getConstituencyDetails(parseInt(constituencyId), electionId);
+    }
+
+    @Get('opponents')
+    async getOpponents(@Query('constituencyId') constituencyId: string) {
+        return this.constituenciesService.getOpponents(parseInt(constituencyId));
     }
 }
