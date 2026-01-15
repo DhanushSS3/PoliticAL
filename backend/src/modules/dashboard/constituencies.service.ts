@@ -141,11 +141,42 @@ export class ConstituenciesService {
             }
         }) as any[]; // TODO: Remove any cast and use proper mapped types
 
+        // Get controversy density for all constituencies
+        // Controversy = count of negative sentiment signals with high confidence in last 30 days
+        const geoUnitIds = summaries.map(s => s.geoUnitId);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const controversyData = await this.prisma.sentimentSignal.groupBy({
+            by: ['geoUnitId'],
+            where: {
+                geoUnitId: { in: geoUnitIds },
+                sentiment: 'NEGATIVE',
+                confidence: { gte: 0.7 },
+                createdAt: { gte: thirtyDaysAgo }
+            },
+            _count: { id: true }
+        });
+
+        // Create a map of geoUnitId -> controversy count
+        const controversyMap = new Map<number, number>();
+        controversyData.forEach(c => {
+            controversyMap.set(c.geoUnitId, c._count.id);
+        });
+
+        // Find max controversy count for normalization
+        const maxControversy = Math.max(...Array.from(controversyMap.values()), 1);
+
         const result = summaries.map(s => {
-            // Mock data for new metrics (consistent based on ID)
+            // Mock data for youth share (requires demographic data)
             const seed = s.geoUnitId * 9301 + 49297;
             const youthShare = (seed % 150) / 10 + 20; // 20.0 to 35.0
-            const controversy = (seed % 100) / 100; // 0.00 to 0.99
+
+            // Actual controversy calculation
+            const controversyCount = controversyMap.get(s.geoUnitId) || 0;
+            const controversy = maxControversy > 0
+                ? parseFloat((controversyCount / maxControversy).toFixed(2))
+                : 0;
 
             return {
                 constituencyId: s.geoUnitId,
@@ -158,7 +189,8 @@ export class ConstituenciesService {
                 margin: s.winningMargin,
                 color: s.partyResults[0]?.party?.colorHex || null,
                 youth: parseFloat(youthShare.toFixed(1)),
-                controversy: parseFloat(controversy.toFixed(2))
+                controversy: controversy,
+                controversyCount: controversyCount // Include raw count for debugging
             };
         });
 
@@ -327,6 +359,135 @@ export class ConstituenciesService {
             return opponents;
         } catch (error) {
             this.logger.error(`Error fetching opponents for constituency #${constituencyId}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get district-level details with constituency breakdown
+     * Used by DistrictProfileModal in frontend
+     */
+    async getDistrictDetails(districtName: string, electionId?: string) {
+        try {
+            this.logger.debug(`Fetching district details for ${districtName}`);
+
+            // Resolve election ID
+            let eId = electionId ? parseInt(electionId) : undefined;
+            if (!eId || isNaN(eId)) {
+                const latest = await this.prisma.election.findFirst({ orderBy: { year: 'desc' } });
+                eId = latest?.id;
+            }
+
+            if (!eId) {
+                this.logger.warn('No election found');
+                return null;
+            }
+
+            // Find district by name
+            const district = await this.prisma.geoUnit.findFirst({
+                where: {
+                    name: districtName,
+                    level: 'DISTRICT'
+                }
+            });
+
+            if (!district) {
+                this.logger.warn(`District ${districtName} not found`);
+                return null;
+            }
+
+            // Get all constituencies in this district
+            const constituencies = await this.prisma.geoUnit.findMany({
+                where: {
+                    parentId: district.id,
+                    level: 'CONSTITUENCY'
+                }
+            });
+
+            const constituencyIds = constituencies.map(c => c.id);
+
+            // Get election summaries for all constituencies
+            const summaries = await this.prisma.geoElectionSummary.findMany({
+                where: {
+                    electionId: eId,
+                    geoUnitId: { in: constituencyIds }
+                },
+                include: {
+                    geoUnit: true
+                }
+            });
+
+            // Get margin details for runner-up info
+            const margins = await this.prisma.constituencyMarginSummary.findMany({
+                where: {
+                    electionId: eId,
+                    geoUnitId: { in: constituencyIds }
+                },
+                include: {
+                    runnerUpParty: true
+                }
+            });
+
+            // Get winner candidate names
+            const results = await this.prisma.electionResultRaw.findMany({
+                where: {
+                    electionId: eId,
+                    geoUnitId: { in: constituencyIds }
+                },
+                include: {
+                    candidate: true,
+                    party: true
+                },
+                orderBy: { votesTotal: 'desc' }
+            });
+
+            // Group results by constituency (winner and runner-up)
+            const resultsByConstituency = new Map<number, any[]>();
+            results.forEach(r => {
+                if (!resultsByConstituency.has(r.geoUnitId)) {
+                    resultsByConstituency.set(r.geoUnitId, []);
+                }
+                resultsByConstituency.get(r.geoUnitId)!.push(r);
+            });
+
+            // Build constituency list
+            const constituencyList = summaries.map(summary => {
+                const margin = margins.find(m => m.geoUnitId === summary.geoUnitId);
+                const constituencyResults = resultsByConstituency.get(summary.geoUnitId) || [];
+                const winner = constituencyResults[0];
+                const runnerUp = constituencyResults[1];
+
+                return {
+                    name: summary.geoUnit.name,
+                    sittingMLA: winner?.candidate.fullName || summary.winningCandidate,
+                    party: winner?.party.name || summary.winningParty,
+                    margin: margin?.marginPercent || summary.winningMarginPct,
+                    defeatedBy: runnerUp
+                        ? `${runnerUp.candidate.fullName} (${runnerUp.party.name})`
+                        : margin
+                            ? `${margin.runnerUpParty.name} Candidate`
+                            : 'N/A'
+                };
+            });
+
+            // Calculate party-wise seat distribution
+            const partyCounts: Record<string, number> = {};
+            summaries.forEach(s => {
+                const party = s.winningParty;
+                partyCounts[party] = (partyCounts[party] || 0) + 1;
+            });
+
+            this.logger.debug(`Found ${constituencyList.length} constituencies in ${districtName}`);
+
+            return {
+                districtId: district.id,
+                districtName: district.name,
+                totalConstituencies: constituencies.length,
+                constituencies: constituencyList,
+                partyWiseSeats: partyCounts
+            };
+        } catch (error) {
+            this.logger.error(`Error fetching district details for ${districtName}:`, error);
             throw error;
         }
     }

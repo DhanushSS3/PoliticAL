@@ -27,6 +27,7 @@ export declare class ConstituenciesService {
         color: any;
         youth: number;
         controversy: number;
+        controversyCount: number;
     }[]>;
     getSubscribed(userId: number): Promise<{
         id: number;
@@ -70,4 +71,17 @@ export declare class ConstituenciesService {
         age: number;
         gender: string;
     }[]>;
+    getDistrictDetails(districtName: string, electionId?: string): Promise<{
+        districtId: number;
+        districtName: string;
+        totalConstituencies: number;
+        constituencies: {
+            name: string;
+            sittingMLA: any;
+            party: any;
+            margin: number;
+            defeatedBy: string;
+        }[];
+        partyWiseSeats: Record<string, number>;
+    }>;
 }

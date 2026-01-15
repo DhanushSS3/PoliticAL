@@ -34,4 +34,12 @@ export class ConstituenciesController {
     async getOpponents(@Query('constituencyId') constituencyId: string) {
         return this.constituenciesService.getOpponents(parseInt(constituencyId));
     }
+
+    @Get('district-details')
+    async getDistrictDetails(
+        @Query('district') district: string,
+        @Query('electionId') electionId?: string
+    ) {
+        return this.constituenciesService.getDistrictDetails(district, electionId);
+    }
 }

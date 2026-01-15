@@ -133,11 +133,32 @@ let ConstituenciesService = ConstituenciesService_1 = class ConstituenciesServic
                 }
             }
         });
+        const geoUnitIds = summaries.map(s => s.geoUnitId);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const controversyData = await this.prisma.sentimentSignal.groupBy({
+            by: ['geoUnitId'],
+            where: {
+                geoUnitId: { in: geoUnitIds },
+                sentiment: 'NEGATIVE',
+                confidence: { gte: 0.7 },
+                createdAt: { gte: thirtyDaysAgo }
+            },
+            _count: { id: true }
+        });
+        const controversyMap = new Map();
+        controversyData.forEach(c => {
+            controversyMap.set(c.geoUnitId, c._count.id);
+        });
+        const maxControversy = Math.max(...Array.from(controversyMap.values()), 1);
         const result = summaries.map(s => {
             var _a, _b, _c;
             const seed = s.geoUnitId * 9301 + 49297;
             const youthShare = (seed % 150) / 10 + 20;
-            const controversy = (seed % 100) / 100;
+            const controversyCount = controversyMap.get(s.geoUnitId) || 0;
+            const controversy = maxControversy > 0
+                ? parseFloat((controversyCount / maxControversy).toFixed(2))
+                : 0;
             return {
                 constituencyId: s.geoUnitId,
                 name: s.geoUnit.name,
@@ -149,7 +170,8 @@ let ConstituenciesService = ConstituenciesService_1 = class ConstituenciesServic
                 margin: s.winningMargin,
                 color: ((_c = (_b = s.partyResults[0]) === null || _b === void 0 ? void 0 : _b.party) === null || _c === void 0 ? void 0 : _c.colorHex) || null,
                 youth: parseFloat(youthShare.toFixed(1)),
-                controversy: parseFloat(controversy.toFixed(2))
+                controversy: controversy,
+                controversyCount: controversyCount
             };
         });
         await this.cacheService.set(cacheKey, result, 600);
@@ -290,6 +312,107 @@ let ConstituenciesService = ConstituenciesService_1 = class ConstituenciesServic
         }
         catch (error) {
             this.logger.error(`Error fetching opponents for constituency #${constituencyId}:`, error);
+            throw error;
+        }
+    }
+    async getDistrictDetails(districtName, electionId) {
+        try {
+            this.logger.debug(`Fetching district details for ${districtName}`);
+            let eId = electionId ? parseInt(electionId) : undefined;
+            if (!eId || isNaN(eId)) {
+                const latest = await this.prisma.election.findFirst({ orderBy: { year: 'desc' } });
+                eId = latest === null || latest === void 0 ? void 0 : latest.id;
+            }
+            if (!eId) {
+                this.logger.warn('No election found');
+                return null;
+            }
+            const district = await this.prisma.geoUnit.findFirst({
+                where: {
+                    name: districtName,
+                    level: 'DISTRICT'
+                }
+            });
+            if (!district) {
+                this.logger.warn(`District ${districtName} not found`);
+                return null;
+            }
+            const constituencies = await this.prisma.geoUnit.findMany({
+                where: {
+                    parentId: district.id,
+                    level: 'CONSTITUENCY'
+                }
+            });
+            const constituencyIds = constituencies.map(c => c.id);
+            const summaries = await this.prisma.geoElectionSummary.findMany({
+                where: {
+                    electionId: eId,
+                    geoUnitId: { in: constituencyIds }
+                },
+                include: {
+                    geoUnit: true
+                }
+            });
+            const margins = await this.prisma.constituencyMarginSummary.findMany({
+                where: {
+                    electionId: eId,
+                    geoUnitId: { in: constituencyIds }
+                },
+                include: {
+                    runnerUpParty: true
+                }
+            });
+            const results = await this.prisma.electionResultRaw.findMany({
+                where: {
+                    electionId: eId,
+                    geoUnitId: { in: constituencyIds }
+                },
+                include: {
+                    candidate: true,
+                    party: true
+                },
+                orderBy: { votesTotal: 'desc' }
+            });
+            const resultsByConstituency = new Map();
+            results.forEach(r => {
+                if (!resultsByConstituency.has(r.geoUnitId)) {
+                    resultsByConstituency.set(r.geoUnitId, []);
+                }
+                resultsByConstituency.get(r.geoUnitId).push(r);
+            });
+            const constituencyList = summaries.map(summary => {
+                const margin = margins.find(m => m.geoUnitId === summary.geoUnitId);
+                const constituencyResults = resultsByConstituency.get(summary.geoUnitId) || [];
+                const winner = constituencyResults[0];
+                const runnerUp = constituencyResults[1];
+                return {
+                    name: summary.geoUnit.name,
+                    sittingMLA: (winner === null || winner === void 0 ? void 0 : winner.candidate.fullName) || summary.winningCandidate,
+                    party: (winner === null || winner === void 0 ? void 0 : winner.party.name) || summary.winningParty,
+                    margin: (margin === null || margin === void 0 ? void 0 : margin.marginPercent) || summary.winningMarginPct,
+                    defeatedBy: runnerUp
+                        ? `${runnerUp.candidate.fullName} (${runnerUp.party.name})`
+                        : margin
+                            ? `${margin.runnerUpParty.name} Candidate`
+                            : 'N/A'
+                };
+            });
+            const partyCounts = {};
+            summaries.forEach(s => {
+                const party = s.winningParty;
+                partyCounts[party] = (partyCounts[party] || 0) + 1;
+            });
+            this.logger.debug(`Found ${constituencyList.length} constituencies in ${districtName}`);
+            return {
+                districtId: district.id,
+                districtName: district.name,
+                totalConstituencies: constituencies.length,
+                constituencies: constituencyList,
+                partyWiseSeats: partyCounts
+            };
+        }
+        catch (error) {
+            this.logger.error(`Error fetching district details for ${districtName}:`, error);
             throw error;
         }
     }
