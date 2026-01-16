@@ -147,22 +147,61 @@ export class ConstituenciesService {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        const controversyData = await this.prisma.sentimentSignal.groupBy({
-            by: ['geoUnitId'],
-            where: {
-                geoUnitId: { in: geoUnitIds },
-                sentiment: 'NEGATIVE',
-                confidence: { gte: 0.7 },
-                createdAt: { gte: thirtyDaysAgo }
-            },
-            _count: { id: true }
-        });
+        // For district level, we need to get controversies from child constituencies
+        let controversyMap = new Map<number, number>();
 
-        // Create a map of geoUnitId -> controversy count
-        const controversyMap = new Map<number, number>();
-        controversyData.forEach(c => {
-            controversyMap.set(c.geoUnitId, c._count.id);
-        });
+        if (level && level.toString() === 'DISTRICT') {
+            // Get all constituencies for these districts
+            const allConstituencies = await this.prisma.geoUnit.findMany({
+                where: {
+                    parentId: { in: geoUnitIds },
+                    level: 'CONSTITUENCY'
+                },
+                select: { id: true, parentId: true }
+            });
+
+            const constituencyIds = allConstituencies.map(c => c.id);
+
+            // Get controversy data for constituencies
+            const controversyData = await this.prisma.sentimentSignal.groupBy({
+                by: ['geoUnitId'],
+                where: {
+                    geoUnitId: { in: constituencyIds },
+                    sentiment: 'NEGATIVE',
+                    confidence: { gte: 0.7 },
+                    createdAt: { gte: thirtyDaysAgo }
+                },
+                _count: { id: true }
+            });
+
+            // Aggregate to district level
+            const districtControversyMap = new Map<number, number>();
+            controversyData.forEach(c => {
+                const constituency = allConstituencies.find(ac => ac.id === c.geoUnitId);
+                if (constituency && constituency.parentId) {
+                    const current = districtControversyMap.get(constituency.parentId) || 0;
+                    districtControversyMap.set(constituency.parentId, current + c._count.id);
+                }
+            });
+
+            controversyMap = districtControversyMap;
+        } else {
+            // Constituency level - direct query
+            const controversyData = await this.prisma.sentimentSignal.groupBy({
+                by: ['geoUnitId'],
+                where: {
+                    geoUnitId: { in: geoUnitIds },
+                    sentiment: 'NEGATIVE',
+                    confidence: { gte: 0.7 },
+                    createdAt: { gte: thirtyDaysAgo }
+                },
+                _count: { id: true }
+            });
+
+            controversyData.forEach(c => {
+                controversyMap.set(c.geoUnitId, c._count.id);
+            });
+        }
 
         // Find max controversy count for normalization
         const maxControversy = Math.max(...Array.from(controversyMap.values()), 1);
@@ -280,6 +319,10 @@ export class ConstituenciesService {
 
         if (!summary || !geoSummary) return null;
 
+        // Calculate real risks and opportunities
+        const risks = await this.calculateRisks(constituencyId, eId);
+        const opportunities = await this.calculateOpportunities(constituencyId, eId);
+
         return {
             id: geoSummary.geoUnitId,
             name: summary.geoUnit.name,
@@ -302,14 +345,150 @@ export class ConstituenciesService {
                 votes: runnerUp?.votesTotal || summary.runnerUpVotes,
                 votePercentage: runnerUp ? parseFloat(((runnerUp.votesTotal / geoSummary.totalVotesCast) * 100).toFixed(2)) : 0
             },
-            risks: [
-                {
-                    type: 'Anti-Incumbency',
-                    severity: (constituencyId % 3 === 0) ? 'high' : (constituencyId % 3 === 1) ? 'medium' : 'low',
-                    description: 'Based on recent sentiment trends and local reports.'
-                }
-            ]
+            risks,
+            opportunities
         };
+    }
+
+    /**
+     * Calculate risks for a constituency based on sentiment and historical data
+     */
+    private async calculateRisks(constituencyId: number, electionId: number) {
+        const risks: Array<{ type: string; severity: 'high' | 'medium' | 'low'; description: string }> = [];
+
+        // Get sentiment data for last 30 days
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const sentiments = await this.prisma.sentimentSignal.findMany({
+            where: {
+                geoUnitId: constituencyId,
+                createdAt: { gte: thirtyDaysAgo }
+            }
+        });
+
+        // Risk 1: Anti-Incumbency (based on negative sentiment)
+        const negativeSentiments = sentiments.filter(s => s.sentiment === 'NEGATIVE');
+        const negativeRatio = sentiments.length > 0 ? negativeSentiments.length / sentiments.length : 0;
+
+        if (negativeRatio > 0.6) {
+            risks.push({
+                type: 'Anti-Incumbency',
+                severity: 'high',
+                description: `High negative sentiment (${(negativeRatio * 100).toFixed(0)}%) in recent news coverage suggests strong anti-incumbency.`
+            });
+        } else if (negativeRatio > 0.4) {
+            risks.push({
+                type: 'Anti-Incumbency',
+                severity: 'medium',
+                description: `Moderate negative sentiment (${(negativeRatio * 100).toFixed(0)}%) detected in constituency.`
+            });
+        }
+
+        // Risk 2: Controversy Density
+        const highConfidenceNegative = negativeSentiments.filter(s => s.confidence > 0.7);
+        if (highConfidenceNegative.length > 5) {
+            risks.push({
+                type: 'Controversy',
+                severity: 'high',
+                description: `${highConfidenceNegative.length} high-impact controversies detected in the last 30 days.`
+            });
+        } else if (highConfidenceNegative.length > 2) {
+            risks.push({
+                type: 'Controversy',
+                severity: 'medium',
+                description: `${highConfidenceNegative.length} controversies reported recently.`
+            });
+        }
+
+        // Risk 3: Narrow Margin (from election data)
+        const margin = await this.prisma.constituencyMarginSummary.findFirst({
+            where: { geoUnitId: constituencyId, electionId }
+        });
+
+        if (margin && margin.marginPercent < 5) {
+            risks.push({
+                type: 'Narrow Margin',
+                severity: 'high',
+                description: `Previous election won by only ${margin.marginPercent.toFixed(2)}% margin. Seat is highly competitive.`
+            });
+        } else if (margin && margin.marginPercent < 10) {
+            risks.push({
+                type: 'Narrow Margin',
+                severity: 'medium',
+                description: `Moderate margin of ${margin.marginPercent.toFixed(2)}% in last election. Requires strong campaign.`
+            });
+        }
+
+        return risks.length > 0 ? risks : [{
+            type: 'Low Risk',
+            severity: 'low',
+            description: 'No significant risks detected based on current data.'
+        }];
+    }
+
+    /**
+     * Calculate opportunities for a constituency
+     */
+    private async calculateOpportunities(constituencyId: number, electionId: number) {
+        const opportunities: Array<{ type: string; impact: 'high' | 'medium' | 'low'; description: string }> = [];
+
+        // Get sentiment data for last 30 days
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const sentiments = await this.prisma.sentimentSignal.findMany({
+            where: {
+                geoUnitId: constituencyId,
+                createdAt: { gte: thirtyDaysAgo }
+            }
+        });
+
+        // Opportunity 1: Positive Sentiment Momentum
+        const positiveSentiments = sentiments.filter(s => s.sentiment === 'POSITIVE');
+        const positiveRatio = sentiments.length > 0 ? positiveSentiments.length / sentiments.length : 0;
+
+        if (positiveRatio > 0.5) {
+            opportunities.push({
+                type: 'Positive Momentum',
+                impact: 'high',
+                description: `Strong positive sentiment (${(positiveRatio * 100).toFixed(0)}%) in recent coverage. Good time to amplify messaging.`
+            });
+        } else if (positiveRatio > 0.3) {
+            opportunities.push({
+                type: 'Positive Momentum',
+                impact: 'medium',
+                description: `Moderate positive sentiment (${(positiveRatio * 100).toFixed(0)}%). Build on current goodwill.`
+            });
+        }
+
+        // Opportunity 2: High Engagement (based on news volume)
+        if (sentiments.length > 20) {
+            opportunities.push({
+                type: 'High Media Attention',
+                impact: 'high',
+                description: `${sentiments.length} news articles in last 30 days. High visibility can be leveraged for campaign messaging.`
+            });
+        }
+
+        // Opportunity 3: Turnout Potential
+        const geoSummary = await this.prisma.geoElectionSummary.findFirst({
+            where: { geoUnitId: constituencyId, electionId }
+        });
+
+        if (geoSummary && geoSummary.turnoutPercent < 70) {
+            opportunities.push({
+                type: 'Turnout Potential',
+                impact: 'medium',
+                description: `Previous turnout was ${geoSummary.turnoutPercent.toFixed(1)}%. Mobilizing non-voters could be decisive.`
+            });
+        }
+
+        return opportunities.length > 0 ? opportunities : [{
+            type: 'Stable Base',
+            impact: 'low',
+            description: 'Focus on maintaining current support levels.'
+        }];
     }
 
     /**

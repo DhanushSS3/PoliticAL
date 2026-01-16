@@ -86,6 +86,11 @@ export class AuthService {
             },
           },
         },
+        candidateProfile: {
+          include: {
+            party: true,
+          },
+        },
       },
     });
   }
@@ -192,6 +197,11 @@ export class AuthService {
                     geoUnit: true,
                   },
                 },
+              },
+            },
+            candidateProfile: {
+              include: {
+                party: true,
               },
             },
           },

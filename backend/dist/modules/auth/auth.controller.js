@@ -57,20 +57,24 @@ let AuthController = class AuthController {
         };
     }
     async getCurrentUser(req) {
+        var _a, _b;
         const user = req.user;
-        return {
-            user: {
-                id: user.id,
-                fullName: user.fullName,
-                email: user.email,
-                phone: user.phone,
-                role: user.role,
-                isTrial: user.isTrial,
-                isActive: user.isActive,
-                subscription: user.subscription,
-                createdAt: user.createdAt,
-            },
+        const response = {
+            id: user.id,
+            fullName: user.fullName,
+            email: user.email,
+            phone: user.phone,
+            role: user.role,
+            isTrial: user.isTrial,
+            isActive: user.isActive,
+            subscription: user.subscription,
+            createdAt: user.createdAt,
         };
+        if (user.role === 'CANDIDATE' && user.candidateProfile) {
+            response.partyName = (_a = user.candidateProfile.party) === null || _a === void 0 ? void 0 : _a.name;
+            response.partyCode = (_b = user.candidateProfile.party) === null || _b === void 0 ? void 0 : _b.symbol;
+        }
+        return { user: response };
     }
     async refreshSession(req) {
         return {

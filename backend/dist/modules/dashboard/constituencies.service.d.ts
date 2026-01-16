@@ -61,7 +61,14 @@ export declare class ConstituenciesService {
             severity: string;
             description: string;
         }[];
+        opportunities: {
+            type: string;
+            impact: string;
+            description: string;
+        }[];
     }>;
+    private calculateRisks;
+    private calculateOpportunities;
     getOpponents(constituencyId: number): Promise<{
         id: number;
         name: string;

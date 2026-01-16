@@ -5,12 +5,13 @@ export declare class NewsIntelligenceService {
     private readonly cacheService;
     private readonly logger;
     constructor(prisma: PrismaService, cacheService: CacheService);
+    private getUserAccessibleGeoUnits;
     private resolveGeoUnitId;
-    getProjectedWinner(geoUnitId: string | number): Promise<unknown>;
-    getControversies(geoUnitId: string | number, days?: number, limit?: number): Promise<unknown>;
-    getHeadToHead(candidate1Id: number, candidate2Id: number, days?: number): Promise<unknown>;
-    getNewsImpact(geoUnitId: string | number, days?: number): Promise<unknown>;
-    getLiveFeed(geoUnitId?: string | number, partyId?: number, limit?: number): Promise<unknown>;
+    getProjectedWinner(geoUnitId?: string | number, userId?: number): Promise<unknown>;
+    getControversies(geoUnitId?: string | number, days?: number, limit?: number, userId?: number): Promise<unknown>;
+    getHeadToHead(candidate1Id: number, candidate2Id: number, days?: number, userId?: number): Promise<unknown>;
+    getNewsImpact(geoUnitId?: string | number, days?: number, userId?: number): Promise<unknown>;
+    getLiveFeed(geoUnitId?: string | number, partyId?: number, limit?: number, userId?: number): Promise<unknown>;
     private getPartyWave;
     private calculateTrend;
     private getCandidateSentiment;

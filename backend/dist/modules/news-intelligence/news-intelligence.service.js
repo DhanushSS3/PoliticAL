@@ -21,7 +21,22 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
         this.cacheService = cacheService;
         this.logger = new common_1.Logger(NewsIntelligenceService_1.name);
     }
-    async resolveGeoUnitId(identifier) {
+    async getUserAccessibleGeoUnits(userId) {
+        const subscription = await this.prisma.subscription.findUnique({
+            where: { userId },
+            include: {
+                access: {
+                    select: { geoUnitId: true }
+                }
+            }
+        });
+        return (subscription === null || subscription === void 0 ? void 0 : subscription.access.map(a => a.geoUnitId)) || [];
+    }
+    async resolveGeoUnitId(identifier, userId) {
+        if (!identifier && userId) {
+            const accessibleGeoUnits = await this.getUserAccessibleGeoUnits(userId);
+            return accessibleGeoUnits[0] || null;
+        }
         if (!identifier || identifier === 'all')
             return null;
         const numericId = typeof identifier === 'number' ? identifier : parseInt(identifier);
@@ -47,9 +62,9 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
         }
         return null;
     }
-    async getProjectedWinner(geoUnitId) {
+    async getProjectedWinner(geoUnitId, userId) {
         var _a, _b, _c, _d;
-        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId, userId);
         if (!resolvedId)
             return null;
         const cacheKey = `news-intel:winner:${resolvedId}`;
@@ -122,8 +137,8 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
         await this.cacheService.set(cacheKey, result, 3600);
         return result;
     }
-    async getControversies(geoUnitId, days = 7, limit = 5) {
-        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+    async getControversies(geoUnitId, days = 7, limit = 5, userId) {
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId, userId);
         if (!resolvedId)
             return [];
         const cacheKey = `news-intel:controversies:${resolvedId}:${days}`;
@@ -169,7 +184,7 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
         await this.cacheService.set(cacheKey, controversies, 900);
         return controversies;
     }
-    async getHeadToHead(candidate1Id, candidate2Id, days = 30) {
+    async getHeadToHead(candidate1Id, candidate2Id, days = 30, userId) {
         const cacheKey = `news-intel:h2h:${candidate1Id}:${candidate2Id}:${days}`;
         const cached = await this.cacheService.get(cacheKey);
         if (cached)
@@ -188,8 +203,8 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
         await this.cacheService.set(cacheKey, result, 1800);
         return result;
     }
-    async getNewsImpact(geoUnitId, days = 7) {
-        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+    async getNewsImpact(geoUnitId, days = 7, userId) {
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId, userId);
         if (!resolvedId)
             return null;
         const cacheKey = `news-intel:impact:${resolvedId}:${days}`;
@@ -240,9 +255,10 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
         await this.cacheService.set(cacheKey, result, 600);
         return result;
     }
-    async getLiveFeed(geoUnitId, partyId, limit = 20) {
-        const resolvedId = geoUnitId ? await this.resolveGeoUnitId(geoUnitId) : null;
-        const cacheKey = `news-intel:feed:${resolvedId || 'all'}:${partyId || 'all'}:${limit}`;
+    async getLiveFeed(geoUnitId, partyId, limit = 20, userId) {
+        const accessibleGeoUnits = userId ? await this.getUserAccessibleGeoUnits(userId) : [];
+        const resolvedId = geoUnitId ? await this.resolveGeoUnitId(geoUnitId, userId) : null;
+        const cacheKey = `news-intel:feed:${resolvedId || 'user-' + userId}:${partyId || 'all'}:${limit}`;
         const cached = await this.cacheService.get(cacheKey);
         if (cached)
             return cached;
@@ -250,18 +266,26 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
             status: 'APPROVED',
             publishedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         };
-        if (resolvedId || partyId) {
+        if (resolvedId || partyId || accessibleGeoUnits.length > 0) {
             where.entityMentions = { some: { OR: [] } };
-            if (resolvedId)
+            if (resolvedId) {
                 where.entityMentions.some.OR.push({
                     entityType: client_1.EntityType.GEO_UNIT,
                     entityId: resolvedId,
                 });
-            if (partyId)
+            }
+            else if (accessibleGeoUnits.length > 0) {
+                where.entityMentions.some.OR.push({
+                    entityType: client_1.EntityType.GEO_UNIT,
+                    entityId: { in: accessibleGeoUnits },
+                });
+            }
+            if (partyId) {
                 where.entityMentions.some.OR.push({
                     entityType: client_1.EntityType.PARTY,
                     entityId: partyId,
                 });
+            }
         }
         const articles = await this.prisma.newsArticle.findMany({
             where,

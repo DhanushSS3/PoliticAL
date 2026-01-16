@@ -13,9 +13,32 @@ export class NewsIntelligenceService {
     ) { }
 
     /**
-     * Resolve a geo unit identifier (ID or Name) to a numeric ID
+     * Get user's accessible geoUnits based on subscription
      */
-    private async resolveGeoUnitId(identifier?: string | number): Promise<number | null> {
+    private async getUserAccessibleGeoUnits(userId: number): Promise<number[]> {
+        const subscription = await this.prisma.subscription.findUnique({
+            where: { userId },
+            include: {
+                access: {
+                    select: { geoUnitId: true }
+                }
+            }
+        });
+
+        return subscription?.access.map(a => a.geoUnitId) || [];
+    }
+
+    /**
+     * Resolve a geo unit identifier (ID or Name) to a numeric ID
+     * If no identifier provided, returns user's first accessible geoUnit
+     */
+    private async resolveGeoUnitId(identifier?: string | number, userId?: number): Promise<number | null> {
+        // If no identifier and userId provided, use user's first accessible geoUnit
+        if (!identifier && userId) {
+            const accessibleGeoUnits = await this.getUserAccessibleGeoUnits(userId);
+            return accessibleGeoUnits[0] || null;
+        }
+
         if (!identifier || identifier === 'all') return null;
 
         // 1. If it's already a number or numeric string
@@ -52,8 +75,8 @@ export class NewsIntelligenceService {
     /**
      * Get projected winner for a constituency using rule-based prediction
      */
-    async getProjectedWinner(geoUnitId: string | number) {
-        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+    async getProjectedWinner(geoUnitId?: string | number, userId?: number) {
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId, userId);
         if (!resolvedId) return null;
 
         const cacheKey = `news-intel:winner:${resolvedId}`;
@@ -159,11 +182,12 @@ export class NewsIntelligenceService {
      * Get recent controversies for a constituency
      */
     async getControversies(
-        geoUnitId: string | number,
+        geoUnitId?: string | number,
         days: number = 7,
         limit: number = 5,
+        userId?: number,
     ) {
-        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId, userId);
         if (!resolvedId) return [];
 
         const cacheKey = `news-intel:controversies:${resolvedId}:${days}`;
@@ -226,6 +250,7 @@ export class NewsIntelligenceService {
         candidate1Id: number,
         candidate2Id: number,
         days: number = 30,
+        userId?: number,
     ) {
         const cacheKey = `news-intel:h2h:${candidate1Id}:${candidate2Id}:${days}`;
         const cached = await this.cacheService.get(cacheKey);
@@ -256,8 +281,8 @@ export class NewsIntelligenceService {
     /**
      * Get news impact analysis for a geo unit
      */
-    async getNewsImpact(geoUnitId: string | number, days: number = 7) {
-        const resolvedId = await this.resolveGeoUnitId(geoUnitId);
+    async getNewsImpact(geoUnitId?: string | number, days: number = 7, userId?: number) {
+        const resolvedId = await this.resolveGeoUnitId(geoUnitId, userId);
         if (!resolvedId) return null;
 
         const cacheKey = `news-intel:impact:${resolvedId}:${days}`;
@@ -322,15 +347,20 @@ export class NewsIntelligenceService {
 
     /**
      * Get live news feed
+     * If no geoUnitId provided, shows news from user's subscribed constituencies
      */
     async getLiveFeed(
         geoUnitId?: string | number,
         partyId?: number,
         limit: number = 20,
+        userId?: number,
     ) {
-        const resolvedId = geoUnitId ? await this.resolveGeoUnitId(geoUnitId) : null;
+        // Get accessible geoUnits for the user
+        const accessibleGeoUnits = userId ? await this.getUserAccessibleGeoUnits(userId) : [];
 
-        const cacheKey = `news-intel:feed:${resolvedId || 'all'}:${partyId || 'all'}:${limit}`;
+        const resolvedId = geoUnitId ? await this.resolveGeoUnitId(geoUnitId, userId) : null;
+
+        const cacheKey = `news-intel:feed:${resolvedId || 'user-' + userId}:${partyId || 'all'}:${limit}`;
         const cached = await this.cacheService.get(cacheKey);
         if (cached) return cached;
 
@@ -339,18 +369,29 @@ export class NewsIntelligenceService {
             publishedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         };
 
-        if (resolvedId || partyId) {
+        // Filter by resolved geoUnit, or user's accessible geoUnits, or party
+        if (resolvedId || partyId || accessibleGeoUnits.length > 0) {
             where.entityMentions = { some: { OR: [] } };
-            if (resolvedId)
+
+            if (resolvedId) {
                 where.entityMentions.some.OR.push({
                     entityType: EntityType.GEO_UNIT,
                     entityId: resolvedId,
                 });
-            if (partyId)
+            } else if (accessibleGeoUnits.length > 0) {
+                // Show news from all accessible geoUnits
+                where.entityMentions.some.OR.push({
+                    entityType: EntityType.GEO_UNIT,
+                    entityId: { in: accessibleGeoUnits },
+                });
+            }
+
+            if (partyId) {
                 where.entityMentions.some.OR.push({
                     entityType: EntityType.PARTY,
                     entityId: partyId,
                 });
+            }
         }
 
         const articles = await this.prisma.newsArticle.findMany({

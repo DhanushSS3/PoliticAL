@@ -20,7 +20,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly passwordService: PasswordService,
-  ) {}
+  ) { }
 
   /**
    * Login with email/phone + password
@@ -95,19 +95,26 @@ export class AuthController {
   async getCurrentUser(@Req() req: any) {
     const user = req.user;
 
-    return {
-      user: {
-        id: user.id,
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        isTrial: user.isTrial,
-        isActive: user.isActive,
-        subscription: user.subscription,
-        createdAt: user.createdAt,
-      },
+    // Build response with party info if user is a candidate
+    const response: any = {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      isTrial: user.isTrial,
+      isActive: user.isActive,
+      subscription: user.subscription,
+      createdAt: user.createdAt,
     };
+
+    // Include party information for candidates
+    if (user.role === 'CANDIDATE' && user.candidateProfile) {
+      response.partyName = user.candidateProfile.party?.name;
+      response.partyCode = user.candidateProfile.party?.symbol;
+    }
+
+    return { user: response };
   }
 
   /**

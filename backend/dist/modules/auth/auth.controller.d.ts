@@ -21,17 +21,7 @@ export declare class AuthController {
         message: string;
     }>;
     getCurrentUser(req: any): Promise<{
-        user: {
-            id: any;
-            fullName: any;
-            email: any;
-            phone: any;
-            role: any;
-            isTrial: any;
-            isActive: any;
-            subscription: any;
-            createdAt: any;
-        };
+        user: any;
     }>;
     refreshSession(req: any): Promise<{
         message: string;

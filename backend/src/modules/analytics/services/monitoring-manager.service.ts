@@ -97,16 +97,29 @@ export class MonitoringManagerService {
 
         // 2. Mark candidate profile as subscribed
         // Fetch the user's subscription to link it
-        const subscription = userId ? await this.prisma.subscription.findUnique({
-            where: { userId }
-        }) : null;
+        let subscription = null;
+        if (userId) {
+            // Verify user exists before linking
+            const userExists = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: { id: true }
+            });
+
+            if (!userExists) {
+                throw new BadRequestException(`User #${userId} not found. Cannot link to candidate profile.`);
+            }
+
+            subscription = await this.prisma.subscription.findUnique({
+                where: { userId }
+            });
+        }
 
         await this.prisma.candidateProfile.update({
             where: { candidateId },
             data: {
                 isSubscribed: true,
-                userId,
-                subscriptionId: subscription?.id,
+                userId: userId || null,
+                subscriptionId: subscription?.id || null,
                 monitoringStartedAt: new Date(),
             },
         });

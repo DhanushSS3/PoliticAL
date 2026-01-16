@@ -58,6 +58,11 @@ export declare class ConstituenciesController {
             severity: string;
             description: string;
         }[];
+        opportunities: {
+            type: string;
+            impact: string;
+            description: string;
+        }[];
     }>;
     getOpponents(constituencyId: string): Promise<{
         id: number;

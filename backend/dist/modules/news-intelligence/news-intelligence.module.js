@@ -12,12 +12,13 @@ const news_intelligence_controller_1 = require("./news-intelligence.controller")
 const news_intelligence_service_1 = require("./news-intelligence.service");
 const prisma_module_1 = require("../../prisma/prisma.module");
 const common_module_1 = require("../../common/common.module");
+const auth_module_1 = require("../auth/auth.module");
 let NewsIntelligenceModule = class NewsIntelligenceModule {
 };
 exports.NewsIntelligenceModule = NewsIntelligenceModule;
 exports.NewsIntelligenceModule = NewsIntelligenceModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule, common_module_1.CommonModule],
+        imports: [prisma_module_1.PrismaModule, common_module_1.CommonModule, auth_module_1.AuthModule],
         controllers: [news_intelligence_controller_1.NewsIntelligenceController],
         providers: [news_intelligence_service_1.NewsIntelligenceService],
         exports: [news_intelligence_service_1.NewsIntelligenceService],

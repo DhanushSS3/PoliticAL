@@ -72,6 +72,11 @@ let AuthService = class AuthService {
                         },
                     },
                 },
+                candidateProfile: {
+                    include: {
+                        party: true,
+                    },
+                },
             },
         });
     }
@@ -132,6 +137,11 @@ let AuthService = class AuthService {
                                         geoUnit: true,
                                     },
                                 },
+                            },
+                        },
+                        candidateProfile: {
+                            include: {
+                                party: true,
                             },
                         },
                     },

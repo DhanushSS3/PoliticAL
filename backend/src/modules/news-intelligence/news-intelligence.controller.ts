@@ -1,21 +1,30 @@
-import { Controller, Get, Query, ParseIntPipe } from '@nestjs/common';
-// News Intelligence Controller handling election projections and sentiment analysis
+import { Controller, Get, Query, ParseIntPipe, UseGuards, Req } from '@nestjs/common';
 import { NewsIntelligenceService } from './news-intelligence.service';
+import { SessionGuard } from '../auth/guards/session.guard';
 
+/**
+ * News Intelligence Controller
+ * 
+ * Handles election projections, controversies, and sentiment analysis.
+ * All endpoints are protected and filter data based on user subscriptions.
+ */
 @Controller('v1/news-intelligence')
+@UseGuards(SessionGuard)
 export class NewsIntelligenceController {
     constructor(private readonly newsIntelligenceService: NewsIntelligenceService) { }
 
     @Get('projected-winner')
     async getProjectedWinner(
-        @Query('geoUnitId') geoUnitId: string,
+        @Req() req: any,
+        @Query('geoUnitId') geoUnitId?: string,
     ) {
-        return this.newsIntelligenceService.getProjectedWinner(geoUnitId);
+        return this.newsIntelligenceService.getProjectedWinner(geoUnitId, req.user.id);
     }
 
     @Get('controversies')
     async getControversies(
-        @Query('geoUnitId') geoUnitId: string,
+        @Req() req: any,
+        @Query('geoUnitId') geoUnitId?: string,
         @Query('days', new ParseIntPipe({ optional: true })) days?: number,
         @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     ) {
@@ -23,11 +32,13 @@ export class NewsIntelligenceController {
             geoUnitId,
             days || 7,
             limit || 5,
+            req.user.id,
         );
     }
 
     @Get('head-to-head')
     async getHeadToHead(
+        @Req() req: any,
         @Query('candidate1Id', ParseIntPipe) candidate1Id: number,
         @Query('candidate2Id', ParseIntPipe) candidate2Id: number,
         @Query('days', new ParseIntPipe({ optional: true })) days?: number,
@@ -36,23 +47,26 @@ export class NewsIntelligenceController {
             candidate1Id,
             candidate2Id,
             days || 30,
+            req.user.id,
         );
     }
 
     @Get('news-impact')
     async getNewsImpact(
-        @Query('geoUnitId') geoUnitId: string,
+        @Req() req: any,
+        @Query('geoUnitId') geoUnitId?: string,
         @Query('days', new ParseIntPipe({ optional: true })) days?: number,
     ) {
-        return this.newsIntelligenceService.getNewsImpact(geoUnitId, days || 7);
+        return this.newsIntelligenceService.getNewsImpact(geoUnitId, days || 7, req.user.id);
     }
 
     @Get('live-feed')
     async getLiveFeed(
+        @Req() req: any,
         @Query('geoUnitId') geoUnitId?: string,
         @Query('partyId', new ParseIntPipe({ optional: true })) partyId?: number,
         @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     ) {
-        return this.newsIntelligenceService.getLiveFeed(geoUnitId, partyId, limit || 20);
+        return this.newsIntelligenceService.getLiveFeed(geoUnitId, partyId, limit || 20, req.user.id);
     }
 }

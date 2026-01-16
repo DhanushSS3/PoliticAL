@@ -55,15 +55,25 @@ let MonitoringManagerService = MonitoringManagerService_1 = class MonitoringMana
                 }
             });
         }
-        const subscription = userId ? await this.prisma.subscription.findUnique({
-            where: { userId }
-        }) : null;
+        let subscription = null;
+        if (userId) {
+            const userExists = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: { id: true }
+            });
+            if (!userExists) {
+                throw new common_1.BadRequestException(`User #${userId} not found. Cannot link to candidate profile.`);
+            }
+            subscription = await this.prisma.subscription.findUnique({
+                where: { userId }
+            });
+        }
         await this.prisma.candidateProfile.update({
             where: { candidateId },
             data: {
                 isSubscribed: true,
-                userId,
-                subscriptionId: subscription === null || subscription === void 0 ? void 0 : subscription.id,
+                userId: userId || null,
+                subscriptionId: (subscription === null || subscription === void 0 ? void 0 : subscription.id) || null,
                 monitoringStartedAt: new Date(),
             },
         });
