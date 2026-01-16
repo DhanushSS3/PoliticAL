@@ -149,12 +149,31 @@ let DashboardService = DashboardService_1 = class DashboardService {
             include: { party: true },
             orderBy: { seatsWon: 'desc' }
         });
-        const result = partyStats.map(stat => ({
-            partyId: stat.partyId,
-            name: stat.party.name,
-            code: stat.party.symbol || stat.party.name.substring(0, 3).toUpperCase(),
-            seats: stat.seatsWon,
-            color: stat.party.colorHex || '#ccc'
+        const result = await Promise.all(partyStats.map(async (stat) => {
+            const voteData = await this.prisma.partyVoteSummary.aggregate({
+                where: {
+                    partyId: stat.partyId,
+                    summary: {
+                        electionId: eId,
+                        geoUnit: { level: 'CONSTITUENCY' }
+                    }
+                },
+                _sum: {
+                    voteCount: true
+                },
+                _avg: {
+                    voteSharePercent: true
+                }
+            });
+            return {
+                partyId: stat.partyId,
+                name: stat.party.name,
+                code: stat.party.symbol || stat.party.name.substring(0, 3).toUpperCase(),
+                seats: stat.seatsWon,
+                votes: voteData._sum.voteCount || 0,
+                voteSharePercent: parseFloat((voteData._avg.voteSharePercent || 0).toFixed(2)),
+                color: stat.party.colorHex || '#ccc'
+            };
         }));
         await this.cacheService.set(cacheKey, result, 300);
         return result;

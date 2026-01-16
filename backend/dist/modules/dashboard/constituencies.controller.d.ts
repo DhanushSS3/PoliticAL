@@ -30,6 +30,17 @@ export declare class ConstituenciesController {
         id: number;
         name: string;
         number: string;
+        level: import(".prisma/client").$Enums.GeoLevel;
+        district: {
+            id: number;
+            name: string;
+            code: string;
+        };
+        state: {
+            id: number;
+            name: string;
+            code: string;
+        };
     }[]>;
     getDetails(constituencyId: string, electionId: string): Promise<{
         id: number;

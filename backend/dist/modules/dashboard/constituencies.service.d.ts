@@ -33,6 +33,17 @@ export declare class ConstituenciesService {
         id: number;
         name: string;
         number: string;
+        level: import(".prisma/client").$Enums.GeoLevel;
+        district: {
+            id: number;
+            name: string;
+            code: string;
+        };
+        state: {
+            id: number;
+            name: string;
+            code: string;
+        };
     }[]>;
     getConstituencyDetails(constituencyId: number, electionId?: string): Promise<{
         id: number;

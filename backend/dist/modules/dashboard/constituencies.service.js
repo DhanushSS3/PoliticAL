@@ -215,7 +215,17 @@ let ConstituenciesService = ConstituenciesService_1 = class ConstituenciesServic
                 where: { userId },
                 include: {
                     access: {
-                        include: { geoUnit: true }
+                        include: {
+                            geoUnit: {
+                                include: {
+                                    parent: {
+                                        include: {
+                                            parent: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             });
@@ -223,14 +233,28 @@ let ConstituenciesService = ConstituenciesService_1 = class ConstituenciesServic
                 this.logger.warn(`No subscription found for user #${userId}`);
                 return [];
             }
-            const constituencies = subscription.access
-                .filter(a => a.geoUnit.level === 'CONSTITUENCY')
-                .map(a => ({
-                id: a.geoUnit.id,
-                name: a.geoUnit.name,
-                number: a.geoUnit.code
-            }));
-            this.logger.debug(`Found ${constituencies.length} constituencies for user #${userId}`);
+            const constituencies = subscription.access.map(a => {
+                const geoUnit = a.geoUnit;
+                const district = geoUnit.parent;
+                const state = district === null || district === void 0 ? void 0 : district.parent;
+                return {
+                    id: geoUnit.id,
+                    name: geoUnit.name,
+                    number: geoUnit.code,
+                    level: geoUnit.level,
+                    district: district ? {
+                        id: district.id,
+                        name: district.name,
+                        code: district.code
+                    } : null,
+                    state: state ? {
+                        id: state.id,
+                        name: state.name,
+                        code: state.code
+                    } : null
+                };
+            });
+            this.logger.debug(`Found ${constituencies.length} geo units for user #${userId}`);
             return constituencies;
         }
         catch (error) {

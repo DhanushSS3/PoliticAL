@@ -5,6 +5,7 @@ export declare class NewsIntelligenceService {
     private readonly cacheService;
     private readonly logger;
     constructor(prisma: PrismaService, cacheService: CacheService);
+    private validateGeoAccess;
     private getUserAccessibleGeoUnits;
     private resolveGeoUnitId;
     getProjectedWinner(geoUnitId?: string | number, userId?: number): Promise<unknown>;

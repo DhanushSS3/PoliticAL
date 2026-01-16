@@ -163,13 +163,34 @@ export class DashboardService {
             orderBy: { seatsWon: 'desc' }
         });
 
-        const result = partyStats.map(stat => ({
-            partyId: stat.partyId,
-            name: stat.party.name,
-            code: stat.party.symbol || stat.party.name.substring(0, 3).toUpperCase(),
-            seats: stat.seatsWon,
-            color: stat.party.colorHex || '#ccc'
-            // voteShare would come from PartyVoteSummary aggregation if needed
+        // Get vote share data for each party
+        const result = await Promise.all(partyStats.map(async (stat) => {
+            // Aggregate votes and vote share across all constituencies
+            const voteData = await this.prisma.partyVoteSummary.aggregate({
+                where: {
+                    partyId: stat.partyId,
+                    summary: {
+                        electionId: eId,
+                        geoUnit: { level: 'CONSTITUENCY' }
+                    }
+                },
+                _sum: {
+                    voteCount: true
+                },
+                _avg: {
+                    voteSharePercent: true
+                }
+            });
+
+            return {
+                partyId: stat.partyId,
+                name: stat.party.name,
+                code: stat.party.symbol || stat.party.name.substring(0, 3).toUpperCase(),
+                seats: stat.seatsWon,
+                votes: voteData._sum.voteCount || 0,
+                voteSharePercent: parseFloat((voteData._avg.voteSharePercent || 0).toFixed(2)),
+                color: stat.party.colorHex || '#ccc'
+            };
         }));
 
         await this.cacheService.set(cacheKey, result, 300);

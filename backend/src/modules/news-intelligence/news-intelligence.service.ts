@@ -13,6 +13,34 @@ export class NewsIntelligenceService {
     ) { }
 
     /**
+     * Validate that user has access to the requested geoUnitId
+     */
+    private async validateGeoAccess(geoUnitId: number, userId: number): Promise<boolean> {
+        // Get user to check role
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { role: true }
+        });
+
+        // Admin users have access to everything
+        if (user?.role === 'ADMIN') {
+            return true;
+        }
+
+        // Check if user has subscription access to this geoUnit
+        const subscription = await this.prisma.subscription.findUnique({
+            where: { userId },
+            include: {
+                access: {
+                    where: { geoUnitId }
+                }
+            }
+        });
+
+        return subscription !== null && subscription.access.length > 0;
+    }
+
+    /**
      * Get user's accessible geoUnits based on subscription
      */
     private async getUserAccessibleGeoUnits(userId: number): Promise<number[]> {
@@ -31,6 +59,7 @@ export class NewsIntelligenceService {
     /**
      * Resolve a geo unit identifier (ID or Name) to a numeric ID
      * If no identifier provided, returns user's first accessible geoUnit
+     * Validates user has access to the resolved geoUnit
      */
     private async resolveGeoUnitId(identifier?: string | number, userId?: number): Promise<number | null> {
         // If no identifier and userId provided, use user's first accessible geoUnit
@@ -43,7 +72,17 @@ export class NewsIntelligenceService {
 
         // 1. If it's already a number or numeric string
         const numericId = typeof identifier === 'number' ? identifier : parseInt(identifier);
-        if (!isNaN(numericId)) return numericId;
+        if (!isNaN(numericId)) {
+            // Validate access if userId provided
+            if (userId) {
+                const hasAccess = await this.validateGeoAccess(numericId, userId);
+                if (!hasAccess) {
+                    this.logger.warn(`User #${userId} does not have access to geoUnit #${numericId}`);
+                    return null;
+                }
+            }
+            return numericId;
+        }
 
         // 2. Resolve by name
         const name = identifier.toString();
@@ -51,7 +90,17 @@ export class NewsIntelligenceService {
         // Check cache first for name resolution
         const cacheKey = `geo-resolve:${name.toLowerCase()}`;
         const cachedId = await this.cacheService.get<number>(cacheKey);
-        if (cachedId) return cachedId;
+        if (cachedId) {
+            // Validate access if userId provided
+            if (userId) {
+                const hasAccess = await this.validateGeoAccess(cachedId, userId);
+                if (!hasAccess) {
+                    this.logger.warn(`User #${userId} does not have access to geoUnit #${cachedId}`);
+                    return null;
+                }
+            }
+            return cachedId;
+        }
 
         // Try exact match or partial match
         const unit = await this.prisma.geoUnit.findFirst({
@@ -66,6 +115,15 @@ export class NewsIntelligenceService {
 
         if (unit) {
             await this.cacheService.set(cacheKey, unit.id, 86400); // Cache resolution for 24h
+
+            // Validate access if userId provided
+            if (userId) {
+                const hasAccess = await this.validateGeoAccess(unit.id, userId);
+                if (!hasAccess) {
+                    this.logger.warn(`User #${userId} does not have access to geoUnit #${unit.id}`);
+                    return null;
+                }
+            }
             return unit.id;
         }
 
@@ -196,46 +254,42 @@ export class NewsIntelligenceService {
 
         const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-        // Get news articles mentioning this constituency with negative sentiment
-        const articles = await this.prisma.newsArticle.findMany({
+        // Get sentiment signals for this geoUnit with negative sentiment
+        const sentimentSignals = await this.prisma.sentimentSignal.findMany({
             where: {
-                publishedAt: { gte: cutoff },
-                status: 'APPROVED',
-                entityMentions: {
-                    some: {
-                        entityType: EntityType.GEO_UNIT,
-                        entityId: resolvedId,
-                    },
-                },
+                geoUnitId: resolvedId,
+                sentiment: SentimentLabel.NEGATIVE,
+                createdAt: { gte: cutoff },
             },
             include: {
-                sentimentSignals: {
-                    where: { sentiment: SentimentLabel.NEGATIVE },
-                },
-                entityMentions: true,
+                newsArticle: {
+                    where: {
+                        status: 'APPROVED'
+                    }
+                }
             },
-            orderBy: { publishedAt: 'desc' },
+            orderBy: { createdAt: 'desc' },
             take: limit * 3, // Fetch more, filter later
         });
 
-        // Calculate impact scores and filter
-        const controversies = articles
-            .filter((a) => a.sentimentSignals.length > 0)
-            .map((a) => ({
-                id: a.id,
-                description: a.title,
-                summary: a.summary,
+        // Filter out null articles and calculate impact scores
+        const controversies = sentimentSignals
+            .filter((s) => s.newsArticle !== null)
+            .map((s) => ({
+                id: s.newsArticle.id,
+                description: s.newsArticle.title,
+                summary: s.newsArticle.summary,
                 type: 'Negative Coverage',
                 sentiment: 'negative' as const,
-                impactScore: Math.round(
-                    Math.abs(a.sentimentSignals[0].sentimentScore) * 100,
-                ),
-                timestamp: this.formatRelativeTime(a.publishedAt),
-                date: a.publishedAt.toISOString(),
-                sourceUrl: a.sourceUrl,
+                impactScore: Math.round(Math.abs(s.sentimentScore) * 100),
+                timestamp: this.formatRelativeTime(s.newsArticle.publishedAt),
+                date: s.newsArticle.publishedAt.toISOString(),
+                sourceUrl: s.newsArticle.sourceUrl,
             }))
             .sort((a, b) => b.impactScore - a.impactScore)
             .slice(0, limit);
+
+        this.logger.debug(`Found ${controversies.length} controversies for geoUnit #${resolvedId} in last ${days} days`);
 
         // Cache for 15 minutes
         await this.cacheService.set(cacheKey, controversies, 900);

@@ -247,7 +247,17 @@ export class ConstituenciesService {
                 where: { userId },
                 include: {
                     access: {
-                        include: { geoUnit: true }
+                        include: {
+                            geoUnit: {
+                                include: {
+                                    parent: {
+                                        include: {
+                                            parent: true // Get state (grandparent)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             });
@@ -257,16 +267,31 @@ export class ConstituenciesService {
                 return [];
             }
 
-            // Filter only CONSTITUENCY level units to avoid State/District appearing in dropdown
-            const constituencies = subscription.access
-                .filter(a => a.geoUnit.level === 'CONSTITUENCY')
-                .map(a => ({
-                    id: a.geoUnit.id,
-                    name: a.geoUnit.name, // Ensure this is not concatenated in DB
-                    number: a.geoUnit.code
-                }));
+            // Map each geoUnit with full hierarchical information
+            const constituencies = subscription.access.map(a => {
+                const geoUnit = a.geoUnit;
+                const district = geoUnit.parent;
+                const state = district?.parent;
 
-            this.logger.debug(`Found ${constituencies.length} constituencies for user #${userId}`);
+                return {
+                    id: geoUnit.id,
+                    name: geoUnit.name,
+                    number: geoUnit.code,
+                    level: geoUnit.level, // CONSTITUENCY, DISTRICT, or STATE
+                    district: district ? {
+                        id: district.id,
+                        name: district.name,
+                        code: district.code
+                    } : null,
+                    state: state ? {
+                        id: state.id,
+                        name: state.name,
+                        code: state.code
+                    } : null
+                };
+            });
+
+            this.logger.debug(`Found ${constituencies.length} geo units for user #${userId}`);
             return constituencies;
         } catch (error) {
             this.logger.error(`Error fetching subscribed constituencies for user #${userId}:`, error);

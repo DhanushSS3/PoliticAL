@@ -21,6 +21,24 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
         this.cacheService = cacheService;
         this.logger = new common_1.Logger(NewsIntelligenceService_1.name);
     }
+    async validateGeoAccess(geoUnitId, userId) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { role: true }
+        });
+        if ((user === null || user === void 0 ? void 0 : user.role) === 'ADMIN') {
+            return true;
+        }
+        const subscription = await this.prisma.subscription.findUnique({
+            where: { userId },
+            include: {
+                access: {
+                    where: { geoUnitId }
+                }
+            }
+        });
+        return subscription !== null && subscription.access.length > 0;
+    }
     async getUserAccessibleGeoUnits(userId) {
         const subscription = await this.prisma.subscription.findUnique({
             where: { userId },
@@ -40,13 +58,29 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
         if (!identifier || identifier === 'all')
             return null;
         const numericId = typeof identifier === 'number' ? identifier : parseInt(identifier);
-        if (!isNaN(numericId))
+        if (!isNaN(numericId)) {
+            if (userId) {
+                const hasAccess = await this.validateGeoAccess(numericId, userId);
+                if (!hasAccess) {
+                    this.logger.warn(`User #${userId} does not have access to geoUnit #${numericId}`);
+                    return null;
+                }
+            }
             return numericId;
+        }
         const name = identifier.toString();
         const cacheKey = `geo-resolve:${name.toLowerCase()}`;
         const cachedId = await this.cacheService.get(cacheKey);
-        if (cachedId)
+        if (cachedId) {
+            if (userId) {
+                const hasAccess = await this.validateGeoAccess(cachedId, userId);
+                if (!hasAccess) {
+                    this.logger.warn(`User #${userId} does not have access to geoUnit #${cachedId}`);
+                    return null;
+                }
+            }
             return cachedId;
+        }
         const unit = await this.prisma.geoUnit.findFirst({
             where: {
                 OR: [
@@ -58,6 +92,13 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
         });
         if (unit) {
             await this.cacheService.set(cacheKey, unit.id, 86400);
+            if (userId) {
+                const hasAccess = await this.validateGeoAccess(unit.id, userId);
+                if (!hasAccess) {
+                    this.logger.warn(`User #${userId} does not have access to geoUnit #${unit.id}`);
+                    return null;
+                }
+            }
             return unit.id;
         }
         return null;
@@ -146,41 +187,38 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
         if (cached)
             return cached;
         const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-        const articles = await this.prisma.newsArticle.findMany({
+        const sentimentSignals = await this.prisma.sentimentSignal.findMany({
             where: {
-                publishedAt: { gte: cutoff },
-                status: 'APPROVED',
-                entityMentions: {
-                    some: {
-                        entityType: client_1.EntityType.GEO_UNIT,
-                        entityId: resolvedId,
-                    },
-                },
+                geoUnitId: resolvedId,
+                sentiment: client_1.SentimentLabel.NEGATIVE,
+                createdAt: { gte: cutoff },
             },
             include: {
-                sentimentSignals: {
-                    where: { sentiment: client_1.SentimentLabel.NEGATIVE },
-                },
-                entityMentions: true,
+                newsArticle: {
+                    where: {
+                        status: 'APPROVED'
+                    }
+                }
             },
-            orderBy: { publishedAt: 'desc' },
+            orderBy: { createdAt: 'desc' },
             take: limit * 3,
         });
-        const controversies = articles
-            .filter((a) => a.sentimentSignals.length > 0)
-            .map((a) => ({
-            id: a.id,
-            description: a.title,
-            summary: a.summary,
+        const controversies = sentimentSignals
+            .filter((s) => s.newsArticle !== null)
+            .map((s) => ({
+            id: s.newsArticle.id,
+            description: s.newsArticle.title,
+            summary: s.newsArticle.summary,
             type: 'Negative Coverage',
             sentiment: 'negative',
-            impactScore: Math.round(Math.abs(a.sentimentSignals[0].sentimentScore) * 100),
-            timestamp: this.formatRelativeTime(a.publishedAt),
-            date: a.publishedAt.toISOString(),
-            sourceUrl: a.sourceUrl,
+            impactScore: Math.round(Math.abs(s.sentimentScore) * 100),
+            timestamp: this.formatRelativeTime(s.newsArticle.publishedAt),
+            date: s.newsArticle.publishedAt.toISOString(),
+            sourceUrl: s.newsArticle.sourceUrl,
         }))
             .sort((a, b) => b.impactScore - a.impactScore)
             .slice(0, limit);
+        this.logger.debug(`Found ${controversies.length} controversies for geoUnit #${resolvedId} in last ${days} days`);
         await this.cacheService.set(cacheKey, controversies, 900);
         return controversies;
     }
