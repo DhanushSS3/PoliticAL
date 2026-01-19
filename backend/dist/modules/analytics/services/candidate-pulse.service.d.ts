@@ -7,7 +7,7 @@ export declare class CandidatePulseService {
     private readonly relevanceCalculator;
     private readonly logger;
     constructor(prisma: PrismaService, relevanceCalculator: RelevanceCalculatorService);
-    calculatePulse(candidateId: number, days?: number): Promise<PulseData>;
+    calculatePulse(candidateId: number, days?: number, skipTrend?: boolean): Promise<PulseData>;
     private calculateTrend;
     getPulseTrend(candidateId: number, days?: number): Promise<Array<{
         date: string;

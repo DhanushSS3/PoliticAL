@@ -26,18 +26,20 @@ export class CandidatePulseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly relevanceCalculator: RelevanceCalculatorService,
-  ) {}
+  ) { }
 
   /**
    * Calculate pulse score for a candidate
    *
    * @param candidateId - The candidate ID
    * @param days - Time window in days (default: 7)
+   * @param skipTrend - Skip trend calculation to avoid recursion (internal use)
    * @returns PulseData with score, trend, and top drivers
    */
   async calculatePulse(
     candidateId: number,
     days: number = 7,
+    skipTrend: boolean = false,
   ): Promise<PulseData> {
     this.logger.debug(
       `Calculating pulse for candidate #${candidateId}, window: ${days} days`,
@@ -173,8 +175,11 @@ export class CandidatePulseService {
     );
     const pulseScore = totalEffectiveScore / scoredSignals.length;
 
-    // 6. Determine trend (compare recent vs older)
-    const trend = await this.calculateTrend(candidateId, days);
+    // 6. Determine trend (compare recent vs older) - only if not skipped
+    let trend: "RISING" | "STABLE" | "DECLINING" = "STABLE";
+    if (!skipTrend) {
+      trend = await this.calculateTrend(candidateId, days, scoredSignals);
+    }
 
     // 7. Get top drivers (articles with highest impact)
     const topDrivers = scoredSignals
@@ -206,29 +211,53 @@ export class CandidatePulseService {
 
   /**
    * Calculate trend by comparing recent period to baseline
+   * Uses the already-fetched signals to avoid recursion
    *
    * @param candidateId - Candidate ID
    * @param days - Total window size
+   * @param allSignals - Already fetched signals
    * @returns Trend indicator
    */
   private async calculateTrend(
     candidateId: number,
     days: number,
+    allSignals: any[],
   ): Promise<"RISING" | "STABLE" | "DECLINING"> {
     const THRESHOLD = 0.15; // Minimum change to be considered a trend
 
     try {
-      // Compare last 2 days vs previous (days-2) days
-      const recentPulse = await this.calculatePulse(candidateId, 2);
-      const baselinePulse = await this.calculatePulse(candidateId, days);
+      if (allSignals.length < 2) {
+        return "STABLE";
+      }
 
-      const delta = recentPulse.pulseScore - baselinePulse.pulseScore;
+      // Split signals into recent (last 2 days) and baseline (all days)
+      const twoDaysAgo = new Date();
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+      const recentSignals = allSignals.filter(
+        (s) => new Date(s.createdAt) >= twoDaysAgo,
+      );
+
+      if (recentSignals.length === 0) {
+        return "STABLE";
+      }
+
+      // Calculate average scores
+      const recentAvg =
+        recentSignals.reduce((sum, s) => sum + s.effectiveScore, 0) /
+        recentSignals.length;
+      const baselineAvg =
+        allSignals.reduce((sum, s) => sum + s.effectiveScore, 0) /
+        allSignals.length;
+
+      const delta = recentAvg - baselineAvg;
 
       if (delta > THRESHOLD) return "RISING";
       if (delta < -THRESHOLD) return "DECLINING";
       return "STABLE";
     } catch (error) {
       // If we can't calculate trend (not enough data), default to STABLE
+      this.logger.warn(`Error calculating trend: ${error.message}`);
       return "STABLE";
     }
   }

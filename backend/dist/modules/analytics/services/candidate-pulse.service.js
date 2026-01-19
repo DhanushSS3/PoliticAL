@@ -20,7 +20,7 @@ let CandidatePulseService = CandidatePulseService_1 = class CandidatePulseServic
         this.relevanceCalculator = relevanceCalculator;
         this.logger = new common_1.Logger(CandidatePulseService_1.name);
     }
-    async calculatePulse(candidateId, days = 7) {
+    async calculatePulse(candidateId, days = 7, skipTrend = false) {
         this.logger.debug(`Calculating pulse for candidate #${candidateId}, window: ${days} days`);
         const candidate = await this.prisma.candidate.findUnique({
             where: { id: candidateId },
@@ -114,7 +114,10 @@ let CandidatePulseService = CandidatePulseService_1 = class CandidatePulseServic
         });
         const totalEffectiveScore = scoredSignals.reduce((sum, s) => sum + s.effectiveScore, 0);
         const pulseScore = totalEffectiveScore / scoredSignals.length;
-        const trend = await this.calculateTrend(candidateId, days);
+        let trend = "STABLE";
+        if (!skipTrend) {
+            trend = await this.calculateTrend(candidateId, days, scoredSignals);
+        }
         const topDrivers = scoredSignals
             .sort((a, b) => Math.abs(b.effectiveScore) - Math.abs(a.effectiveScore))
             .slice(0, 5)
@@ -140,12 +143,23 @@ let CandidatePulseService = CandidatePulseService_1 = class CandidatePulseServic
             topDrivers,
         };
     }
-    async calculateTrend(candidateId, days) {
+    async calculateTrend(candidateId, days, allSignals) {
         const THRESHOLD = 0.15;
         try {
-            const recentPulse = await this.calculatePulse(candidateId, 2);
-            const baselinePulse = await this.calculatePulse(candidateId, days);
-            const delta = recentPulse.pulseScore - baselinePulse.pulseScore;
+            if (allSignals.length < 2) {
+                return "STABLE";
+            }
+            const twoDaysAgo = new Date();
+            twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+            const recentSignals = allSignals.filter((s) => new Date(s.createdAt) >= twoDaysAgo);
+            if (recentSignals.length === 0) {
+                return "STABLE";
+            }
+            const recentAvg = recentSignals.reduce((sum, s) => sum + s.effectiveScore, 0) /
+                recentSignals.length;
+            const baselineAvg = allSignals.reduce((sum, s) => sum + s.effectiveScore, 0) /
+                allSignals.length;
+            const delta = recentAvg - baselineAvg;
             if (delta > THRESHOLD)
                 return "RISING";
             if (delta < -THRESHOLD)
@@ -153,6 +167,7 @@ let CandidatePulseService = CandidatePulseService_1 = class CandidatePulseServic
             return "STABLE";
         }
         catch (error) {
+            this.logger.warn(`Error calculating trend: ${error.message}`);
             return "STABLE";
         }
     }
