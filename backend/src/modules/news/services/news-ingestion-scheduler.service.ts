@@ -21,13 +21,15 @@ export class NewsIngestionSchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly newsIngestion: NewsIngestionService,
-  ) {}
+  ) { }
 
   /**
    * Tier 1: High Priority (Candidates, Parties, Constituencies)
    * Runs every hour (00:00, 01:00, ...)
+   * 
+   * ⚠️ DISABLED: Now using worker-based queue system (NewsQueueSchedulerService)
    */
-  @Cron(CronExpression.EVERY_HOUR)
+  // @Cron(CronExpression.EVERY_HOUR)
   async scheduleTier1() {
     this.logger.log("🕒 Starting TIER 1 news ingestion (Priority >= 8)...");
     await this.runIngestionForTier(8, 10);
@@ -36,8 +38,10 @@ export class NewsIngestionSchedulerService {
   /**
    * Tier 2: Medium Priority (Districts, Dependent Queues)
    * Runs every 2 hours (00:00, 02:00, ...)
+   * 
+   * ⚠️ DISABLED: Now using worker-based queue system (NewsQueueSchedulerService)
    */
-  @Cron("0 0 */2 * * *")
+  // @Cron("0 0 */2 * * *")
   async scheduleTier2() {
     this.logger.log("🕒 Starting TIER 2 news ingestion (Priority 5-7)...");
     await this.runIngestionForTier(5, 7);
@@ -46,8 +50,10 @@ export class NewsIngestionSchedulerService {
   /**
    * Tier 3: Low Priority (States, National, Background)
    * Runs every 6 hours (00:00, 06:00, ...)
+   * 
+   * ⚠️ DISABLED: Now using worker-based queue system (NewsQueueSchedulerService)
    */
-  @Cron("0 0 */6 * * *")
+  // @Cron("0 0 */6 * * *")
   async scheduleTier3() {
     this.logger.log("🕒 Starting TIER 3 news ingestion (Priority <= 4)...");
     await this.runIngestionForTier(0, 4);

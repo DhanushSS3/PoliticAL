@@ -10,6 +10,7 @@ exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const schedule_1 = require("@nestjs/schedule");
+const bullmq_1 = require("@nestjs/bullmq");
 const prisma_module_1 = require("./prisma/prisma.module");
 const database_config_1 = require("./config/database.config");
 const auth_config_1 = require("./config/auth.config");
@@ -38,6 +39,17 @@ exports.AppModule = AppModule = __decorate([
                 load: [database_config_1.default, auth_config_1.default, app_config_1.default],
             }),
             schedule_1.ScheduleModule.forRoot(),
+            bullmq_1.BullModule.forRootAsync({
+                imports: [config_1.ConfigModule],
+                useFactory: (configService) => ({
+                    connection: {
+                        host: configService.get('REDIS_HOST', 'localhost'),
+                        port: configService.get('REDIS_PORT', 6379),
+                        password: configService.get('REDIS_PASSWORD', ''),
+                    },
+                }),
+                inject: [config_1.ConfigService],
+            }),
             prisma_module_1.PrismaModule,
             auth_module_1.AuthModule,
             users_module_1.UsersModule,

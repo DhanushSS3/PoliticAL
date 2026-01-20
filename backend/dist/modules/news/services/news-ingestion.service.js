@@ -12,19 +12,25 @@ var NewsIngestionService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NewsIngestionService = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const prisma_service_1 = require("../../../prisma/prisma.service");
 const keyword_manager_service_1 = require("./keyword-manager.service");
 const sentiment_analysis_service_1 = require("./sentiment-analysis.service");
 const client_1 = require("@prisma/client");
+const news_sources_config_1 = require("../config/news-sources.config");
 const Parser = require("rss-parser");
 let NewsIngestionService = NewsIngestionService_1 = class NewsIngestionService {
-    constructor(prisma, keywordManager, sentimentService) {
+    constructor(prisma, keywordManager, sentimentService, configService) {
         this.prisma = prisma;
         this.keywordManager = keywordManager;
         this.sentimentService = sentimentService;
+        this.configService = configService;
         this.logger = new common_1.Logger(NewsIngestionService_1.name);
         this.parser = new Parser();
         this.GOOGLE_NEWS_BASE_URL = "https://news.google.com/rss/search?q=";
+        this.maxArticleAgeHours = this.configService.get('NEWS_ARTICLE_MAX_AGE_HOURS', 48);
+        const filterKey = this.configService.get('GOOGLE_NEWS_TIME_FILTER', 'd');
+        this.timeFilter = news_sources_config_1.GOOGLE_NEWS_TIME_FILTERS[`PAST_${filterKey.toUpperCase()}`] || news_sources_config_1.GOOGLE_NEWS_TIME_FILTERS.PAST_DAY;
     }
     async fetchAllNews() {
         this.logger.log("Starting Google News ingestion job (ACTIVE entities only)...");
@@ -63,8 +69,9 @@ let NewsIngestionService = NewsIngestionService_1 = class NewsIngestionService {
                 return;
             }
             this.logger.debug(`Fetching news for ${entityType} #${entityId} using query: ${query}`);
-            const encodedQuery = encodeURIComponent(query + " sort:newest");
-            const feedUrl = `${this.GOOGLE_NEWS_BASE_URL}${encodedQuery}&hl=en-IN&gl=IN&ceid=IN:en`;
+            const encodedQuery = encodeURIComponent(query);
+            const feedUrl = `${this.GOOGLE_NEWS_BASE_URL}${encodedQuery}&hl=en-IN&gl=IN&ceid=IN:en&tbs=${this.timeFilter}`;
+            this.logger.debug(`Feed URL: ${feedUrl}`);
             const feed = await this.parser.parseURL(feedUrl);
             for (const item of feed.items) {
                 await this.processFeedItem(item, entityType, entityId);
@@ -86,6 +93,11 @@ let NewsIngestionService = NewsIngestionService_1 = class NewsIngestionService {
             const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
             const sourceName = item.source || "Google News";
             const summary = item.contentSnippet || item.content || item.title;
+            const articleAgeHours = this.getArticleAgeInHours(pubDate);
+            if (articleAgeHours > this.maxArticleAgeHours) {
+                this.logger.debug(`Skipping old article (${articleAgeHours.toFixed(1)}h old): "${title}"`);
+                return;
+            }
             const existing = await this.prisma.newsArticle.findFirst({
                 where: { sourceUrl: link },
             });
@@ -137,12 +149,34 @@ let NewsIngestionService = NewsIngestionService_1 = class NewsIngestionService {
             this.logger.warn(`Failed to save article "${item.title}": ${error.message}`);
         }
     }
+    getArticleAgeInHours(pubDate) {
+        const now = new Date();
+        const diffMs = now.getTime() - pubDate.getTime();
+        return diffMs / (1000 * 60 * 60);
+    }
+    async buildEnhancedQuery(entityType, entityId) {
+        const baseQuery = await this.keywordManager.buildSearchQuery(entityType, entityId);
+        if (!baseQuery) {
+            return [];
+        }
+        if (entityType === client_1.EntityType.CANDIDATE) {
+            const queries = [];
+            queries.push(baseQuery);
+            const topEventKeywords = news_sources_config_1.EVENT_KEYWORDS.slice(0, 3);
+            for (const keyword of topEventKeywords) {
+                queries.push(`${baseQuery} "${keyword}"`);
+            }
+            return queries;
+        }
+        return [baseQuery];
+    }
 };
 exports.NewsIngestionService = NewsIngestionService;
 exports.NewsIngestionService = NewsIngestionService = NewsIngestionService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         keyword_manager_service_1.KeywordManagerService,
-        sentiment_analysis_service_1.SentimentAnalysisService])
+        sentiment_analysis_service_1.SentimentAnalysisService,
+        config_1.ConfigService])
 ], NewsIngestionService);
 //# sourceMappingURL=news-ingestion.service.js.map

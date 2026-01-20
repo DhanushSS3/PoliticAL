@@ -1,9 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { KeywordManagerService } from "./keyword-manager.service";
 import { SentimentAnalysisService } from "./sentiment-analysis.service";
 import { EntityType, NewsIngestType, ModerationStatus } from "@prisma/client";
+import { EVENT_KEYWORDS, GOOGLE_NEWS_TIME_FILTERS } from "../config/news-sources.config";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Parser = require("rss-parser");
 
@@ -13,12 +15,25 @@ export class NewsIngestionService {
   private readonly parser = new Parser();
   private readonly GOOGLE_NEWS_BASE_URL =
     "https://news.google.com/rss/search?q=";
+  private readonly maxArticleAgeHours: number;
+  private readonly timeFilter: string;
 
   constructor(
     private prisma: PrismaService,
     private keywordManager: KeywordManagerService,
     private sentimentService: SentimentAnalysisService,
-  ) { }
+    private configService: ConfigService,
+  ) {
+    this.maxArticleAgeHours = this.configService.get<number>(
+      'NEWS_ARTICLE_MAX_AGE_HOURS',
+      48,
+    );
+    const filterKey = this.configService.get<string>(
+      'GOOGLE_NEWS_TIME_FILTER',
+      'd',
+    );
+    this.timeFilter = GOOGLE_NEWS_TIME_FILTERS[`PAST_${filterKey.toUpperCase()}`] || GOOGLE_NEWS_TIME_FILTERS.PAST_DAY;
+  }
 
   /**
    * Main job entry point: Fetch news for ACTIVELY MONITORED entities only
@@ -103,10 +118,12 @@ export class NewsIngestionService {
         `Fetching news for ${entityType} #${entityId} using query: ${query}`,
       );
 
-      // 2. Fetch RSS Feed
-      const encodedQuery = encodeURIComponent(query + " sort:newest");
-      const feedUrl = `${this.GOOGLE_NEWS_BASE_URL}${encodedQuery}&hl=en-IN&gl=IN&ceid=IN:en`;
+      // 2. Fetch RSS Feed with TIME-BASED FILTERING (tbs parameter)
+      // This forces Google to prioritize recency over relevance
+      const encodedQuery = encodeURIComponent(query);
+      const feedUrl = `${this.GOOGLE_NEWS_BASE_URL}${encodedQuery}&hl=en-IN&gl=IN&ceid=IN:en&tbs=${this.timeFilter}`;
 
+      this.logger.debug(`Feed URL: ${feedUrl}`);
       const feed = await this.parser.parseURL(feedUrl);
 
       // 3. Process Items
@@ -141,6 +158,15 @@ export class NewsIngestionService {
       const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
       const sourceName = item.source || "Google News";
       const summary = item.contentSnippet || item.content || item.title;
+
+      // ✅ CRITICAL: Post-processing filter - Check article age
+      const articleAgeHours = this.getArticleAgeInHours(pubDate);
+      if (articleAgeHours > this.maxArticleAgeHours) {
+        this.logger.debug(
+          `Skipping old article (${articleAgeHours.toFixed(1)}h old): "${title}"`,
+        );
+        return;
+      }
 
       // 1. Deduplication Check
       const existing = await this.prisma.newsArticle.findFirst({
@@ -210,5 +236,50 @@ export class NewsIngestionService {
         `Failed to save article "${item.title}": ${error.message}`,
       );
     }
+  }
+
+  /**
+   * Calculate article age in hours
+   */
+  private getArticleAgeInHours(pubDate: Date): number {
+    const now = new Date();
+    const diffMs = now.getTime() - pubDate.getTime();
+    return diffMs / (1000 * 60 * 60);
+  }
+
+  /**
+   * Build enhanced query with event-based keywords
+   * This creates multiple search variations to find actionable news
+   */
+  async buildEnhancedQuery(
+    entityType: EntityType,
+    entityId: number,
+  ): Promise<string[]> {
+    const baseQuery = await this.keywordManager.buildSearchQuery(
+      entityType,
+      entityId,
+    );
+
+    if (!baseQuery) {
+      return [];
+    }
+
+    // For candidates, create event-based variations
+    if (entityType === EntityType.CANDIDATE) {
+      const queries: string[] = [];
+
+      // Add base query
+      queries.push(baseQuery);
+
+      // Add top event-based variations (limit to avoid too many requests)
+      const topEventKeywords = EVENT_KEYWORDS.slice(0, 3);
+      for (const keyword of topEventKeywords) {
+        queries.push(`${baseQuery} "${keyword}"`);
+      }
+
+      return queries;
+    }
+
+    return [baseQuery];
   }
 }

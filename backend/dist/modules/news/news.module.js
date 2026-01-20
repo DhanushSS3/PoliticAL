@@ -9,6 +9,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NewsModule = void 0;
 const common_1 = require("@nestjs/common");
 const axios_1 = require("@nestjs/axios");
+const bullmq_1 = require("@nestjs/bullmq");
+const config_1 = require("@nestjs/config");
 const keyword_manager_service_1 = require("./services/keyword-manager.service");
 const news_ingestion_service_1 = require("./services/news-ingestion.service");
 const sentiment_analysis_service_1 = require("./services/sentiment-analysis.service");
@@ -17,16 +19,27 @@ const news_service_1 = require("./services/news.service");
 const geo_attribution_resolver_service_1 = require("./services/geo-attribution-resolver.service");
 const relevance_calculator_service_1 = require("../analytics/services/relevance-calculator.service");
 const admin_news_controller_1 = require("./admin-news.controller");
+const admin_news_queue_controller_1 = require("./admin-news-queue.controller");
 const news_controller_1 = require("./news.controller");
 const auth_module_1 = require("../auth/auth.module");
 const news_ingestion_scheduler_service_1 = require("./services/news-ingestion-scheduler.service");
+const rss_feed_ingestion_service_1 = require("./services/rss-feed-ingestion.service");
+const news_queue_scheduler_service_1 = require("./services/news-queue-scheduler.service");
+const google_news_worker_1 = require("./workers/google-news.worker");
+const rss_feed_worker_1 = require("./workers/rss-feed.worker");
+const queue_config_1 = require("./config/queue.config");
 let NewsModule = class NewsModule {
 };
 exports.NewsModule = NewsModule;
 exports.NewsModule = NewsModule = __decorate([
     (0, common_1.Module)({
-        imports: [auth_module_1.AuthModule, axios_1.HttpModule],
-        controllers: [admin_news_controller_1.AdminNewsController, news_controller_1.NewsController],
+        imports: [
+            auth_module_1.AuthModule,
+            axios_1.HttpModule,
+            config_1.ConfigModule,
+            bullmq_1.BullModule.registerQueue({ name: queue_config_1.NEWS_QUEUES.GOOGLE_NEWS }, { name: queue_config_1.NEWS_QUEUES.RSS_FEEDS }),
+        ],
+        controllers: [admin_news_controller_1.AdminNewsController, admin_news_queue_controller_1.AdminNewsQueueController, news_controller_1.NewsController],
         providers: [
             keyword_manager_service_1.KeywordManagerService,
             news_ingestion_service_1.NewsIngestionService,
@@ -35,7 +48,11 @@ exports.NewsModule = NewsModule = __decorate([
             news_service_1.NewsService,
             geo_attribution_resolver_service_1.GeoAttributionResolverService,
             relevance_calculator_service_1.RelevanceCalculatorService,
+            rss_feed_ingestion_service_1.RssFeedIngestionService,
+            news_queue_scheduler_service_1.NewsQueueSchedulerService,
             news_ingestion_scheduler_service_1.NewsIngestionSchedulerService,
+            google_news_worker_1.GoogleNewsWorker,
+            rss_feed_worker_1.RssFeedWorker,
         ],
         exports: [
             keyword_manager_service_1.KeywordManagerService,
@@ -45,6 +62,8 @@ exports.NewsModule = NewsModule = __decorate([
             news_service_1.NewsService,
             geo_attribution_resolver_service_1.GeoAttributionResolverService,
             relevance_calculator_service_1.RelevanceCalculatorService,
+            rss_feed_ingestion_service_1.RssFeedIngestionService,
+            news_queue_scheduler_service_1.NewsQueueSchedulerService,
         ],
     })
 ], NewsModule);

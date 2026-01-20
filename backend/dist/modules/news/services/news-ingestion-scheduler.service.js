@@ -12,7 +12,6 @@ var NewsIngestionSchedulerService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NewsIngestionSchedulerService = void 0;
 const common_1 = require("@nestjs/common");
-const schedule_1 = require("@nestjs/schedule");
 const prisma_service_1 = require("../../../prisma/prisma.service");
 const news_ingestion_service_1 = require("./news-ingestion.service");
 let NewsIngestionSchedulerService = NewsIngestionSchedulerService_1 = class NewsIngestionSchedulerService {
@@ -71,24 +70,6 @@ let NewsIngestionSchedulerService = NewsIngestionSchedulerService_1 = class News
     }
 };
 exports.NewsIngestionSchedulerService = NewsIngestionSchedulerService;
-__decorate([
-    (0, schedule_1.Cron)(schedule_1.CronExpression.EVERY_HOUR),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], NewsIngestionSchedulerService.prototype, "scheduleTier1", null);
-__decorate([
-    (0, schedule_1.Cron)("0 0 */2 * * *"),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], NewsIngestionSchedulerService.prototype, "scheduleTier2", null);
-__decorate([
-    (0, schedule_1.Cron)("0 0 */6 * * *"),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], NewsIngestionSchedulerService.prototype, "scheduleTier3", null);
 exports.NewsIngestionSchedulerService = NewsIngestionSchedulerService = NewsIngestionSchedulerService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,

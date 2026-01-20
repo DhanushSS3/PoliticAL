@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import { BullModule } from "@nestjs/bullmq";
 import { PrismaModule } from "./prisma/prisma.module";
 import databaseConfig from "./config/database.config";
 import authConfig from "./config/auth.config";
@@ -26,6 +27,18 @@ import { NewsIntelligenceModule } from "./modules/news-intelligence/news-intelli
       load: [databaseConfig, authConfig, appConfig],
     }),
     ScheduleModule.forRoot(),
+    // BullMQ global configuration
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get('REDIS_HOST', 'localhost'),
+          port: configService.get('REDIS_PORT', 6379),
+          password: configService.get('REDIS_PASSWORD', ''),
+        },
+      }),
+      inject: [ConfigService],
+    }),
     PrismaModule,
     AuthModule,
     UsersModule,
