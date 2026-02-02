@@ -15,6 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DashboardController = void 0;
 const common_1 = require("@nestjs/common");
 const dashboard_service_1 = require("./dashboard.service");
+const session_guard_1 = require("../auth/guards/session.guard");
+const geo_access_guard_1 = require("../auth/guards/geo-access.guard");
 let DashboardController = class DashboardController {
     constructor(dashboardService) {
         this.dashboardService = dashboardService;
@@ -27,6 +29,9 @@ let DashboardController = class DashboardController {
     }
     async getHistoricalStats() {
         return this.dashboardService.getHistoricalStats();
+    }
+    async getReligionDistribution(geoUnitId, year) {
+        return this.dashboardService.getReligionDistribution(geoUnitId, year);
     }
 };
 exports.DashboardController = DashboardController;
@@ -52,6 +57,15 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], DashboardController.prototype, "getHistoricalStats", null);
+__decorate([
+    (0, common_1.Get)('religion-distribution'),
+    (0, common_1.UseGuards)(session_guard_1.SessionGuard, geo_access_guard_1.GeoAccessGuard),
+    __param(0, (0, common_1.Query)('geoUnitId', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Query)('year', new common_1.ParseIntPipe({ optional: true }))),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number]),
+    __metadata("design:returntype", Promise)
+], DashboardController.prototype, "getReligionDistribution", null);
 exports.DashboardController = DashboardController = __decorate([
     (0, common_1.Controller)('v1/dashboard'),
     __metadata("design:paramtypes", [dashboard_service_1.DashboardService])

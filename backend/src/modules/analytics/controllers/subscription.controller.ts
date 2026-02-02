@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { MonitoringManagerService } from "../services/monitoring-manager.service";
 import { CreateCandidateDto } from "../dto/create-candidate.dto";
+import { ActivateEntityDto } from "../dto/activate-entity.dto";
 
 @Controller("admin/subscriptions")
 export class SubscriptionController {
@@ -82,6 +83,27 @@ export class SubscriptionController {
         await this.monitoringManager.activateGeoMonitoring(id);
         return {
             message: `Monitoring activated for GeoUnit #${id}`,
+        };
+    }
+
+    /**
+     * POST /api/admin/subscriptions/entities
+     * Activate monitoring for any entity type and seed keywords
+     */
+    @Post("entities")
+    async activateEntity(@Body() dto: ActivateEntityDto) {
+        const result = await this.monitoringManager.activateEntityWithKeywords({
+            entityType: dto.entityType,
+            entityId: dto.entityId,
+            priority: dto.priority,
+            reason: dto.reason,
+            triggeredByCandidateId: dto.triggeredByCandidateId,
+        });
+
+        return {
+            success: true,
+            message: `Monitoring activated for ${dto.entityType} #${dto.entityId}`,
+            ...result,
         };
     }
 

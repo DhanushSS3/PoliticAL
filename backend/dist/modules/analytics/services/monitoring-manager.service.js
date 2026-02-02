@@ -131,6 +131,22 @@ let MonitoringManagerService = MonitoringManagerService_1 = class MonitoringMana
         await this.keywordManager.seedKeywordsForEntity(client_1.EntityType.GEO_UNIT, geoUnitId, geoUnit.name);
         this.logger.log(`✅ Activated monitoring for GeoUnit #${geoUnitId}`);
     }
+    async activateEntityWithKeywords(options) {
+        const { entityType, entityId, priority = 5, reason = "ADMIN_OVERRIDE", triggeredByCandidateId = 0, } = options;
+        const displayName = await this.getEntityDisplayName(entityType, entityId);
+        if (!displayName) {
+            throw new common_1.BadRequestException(`Unsupported or missing entity for monitoring: ${entityType} #${entityId}`);
+        }
+        await this.activateEntity(entityType, entityId, reason, triggeredByCandidateId, priority);
+        await this.keywordManager.seedKeywordsForEntity(entityType, entityId, displayName);
+        return {
+            entityType,
+            entityId,
+            priority,
+            reason,
+            displayName,
+        };
+    }
     async deactivateMonitoring(candidateId) {
         this.logger.log(`Deactivating monitoring for candidate #${candidateId}`);
         await this.prisma.candidateProfile.update({
@@ -192,6 +208,34 @@ let MonitoringManagerService = MonitoringManagerService_1 = class MonitoringMana
                 updatedAt: new Date(),
             },
         });
+    }
+    async getEntityDisplayName(entityType, entityId) {
+        var _a, _b, _c;
+        switch (entityType) {
+            case client_1.EntityType.CANDIDATE: {
+                const candidate = await this.prisma.candidate.findUnique({
+                    where: { id: entityId },
+                    select: { fullName: true },
+                });
+                return (_a = candidate === null || candidate === void 0 ? void 0 : candidate.fullName) !== null && _a !== void 0 ? _a : null;
+            }
+            case client_1.EntityType.PARTY: {
+                const party = await this.prisma.party.findUnique({
+                    where: { id: entityId },
+                    select: { name: true },
+                });
+                return (_b = party === null || party === void 0 ? void 0 : party.name) !== null && _b !== void 0 ? _b : null;
+            }
+            case client_1.EntityType.GEO_UNIT: {
+                const geo = await this.prisma.geoUnit.findUnique({
+                    where: { id: entityId },
+                    select: { name: true },
+                });
+                return (_c = geo === null || geo === void 0 ? void 0 : geo.name) !== null && _c !== void 0 ? _c : null;
+            }
+            default:
+                return null;
+        }
     }
     async seedKeywordsForActivatedEntities(candidateId, opponents) {
         const candidate = await this.prisma.candidate.findUnique({

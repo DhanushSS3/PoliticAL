@@ -13,6 +13,8 @@ export declare class NewsIntelligenceService {
     getHeadToHead(candidate1Id: number, candidate2Id: number, days?: number, userId?: number): Promise<unknown>;
     getNewsImpact(geoUnitId?: string | number, days?: number, userId?: number): Promise<unknown>;
     getLiveFeed(geoUnitId?: string | number, partyId?: number, limit?: number, userId?: number): Promise<unknown>;
+    getDashboardSentiment(days?: number, partyLimit?: number): Promise<unknown>;
+    getDashboardNewsImpact(days?: number, partyLimit?: number): Promise<unknown>;
     private getPartyWave;
     private calculateTrend;
     private getCandidateSentiment;

@@ -117,6 +117,77 @@ export class AdminNewsController {
     };
   }
 
+  /**
+   * Admin-only Sentiment Preview
+   *
+   * Allows admins to submit TEXT, LINK (with text), or FILE and get
+   * a detailed sentiment analysis report WITHOUT persisting a NewsArticle.
+   *
+   * This reuses the same parsing logic as manual ingestion but stops
+   * after calling the analysis service.
+   */
+  @Post("preview-sentiment")
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor("file"))
+  async previewSentiment(
+    @Body() dto: ManualNewsIngestionDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    let content = "";
+    let sourceUrl = "";
+    let title = dto.title || "Manual Entry";
+
+    if (dto.inputType === ManualInputType.FILE) {
+      if (!file)
+        throw new BadRequestException("File is required for FILE input type");
+
+      content = await this.fileParsingService.parseFile(
+        file.buffer,
+        file.originalname,
+      );
+      sourceUrl = `file://${file.originalname}`;
+      title = file.originalname;
+    } else if (dto.inputType === ManualInputType.LINK) {
+      if (!dto.linkUrl)
+        throw new BadRequestException(
+          "Link URL is required for LINK input type",
+        );
+
+      if (!dto.textContent)
+        throw new BadRequestException(
+          "Text content is required for LINK input type preview until link fetching is implemented",
+        );
+
+      sourceUrl = dto.linkUrl;
+      content = dto.textContent;
+    } else if (dto.inputType === ManualInputType.TEXT) {
+      if (!dto.textContent)
+        throw new BadRequestException(
+          "Text content is required for TEXT input type",
+        );
+
+      content = dto.textContent;
+      sourceUrl = "manual://text-entry";
+    } else {
+      throw new BadRequestException("Unsupported input type");
+    }
+
+    if (!content) {
+      throw new BadRequestException("No content could be extracted");
+    }
+
+    const sentiment = await this.sentimentService.analyzeText(content);
+
+    return {
+      message: "Sentiment preview generated successfully",
+      inputType: dto.inputType,
+      title,
+      sourceUrl,
+      contentPreview: content.substring(0, 500),
+      sentiment,
+    };
+  }
+
 
   /**
    * Add a keyword manually

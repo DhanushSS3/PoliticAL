@@ -20,7 +20,7 @@ exports.BANGALORE_NEWS_SOURCES = [
     },
     {
         name: 'New Indian Express - Bangalore',
-        url: 'https://www.newindianexpress.com/Cities/Bengaluru/rssfeed/?id=182&getXmlFeed=true',
+        url: 'https://www.newindianexpress.com/cities/bengaluru/rssfeed/',
         description: 'Civic issues & BBMP',
         priority: 8,
         language: 'en',
@@ -36,7 +36,7 @@ exports.BANGALORE_NEWS_SOURCES = [
     },
     {
         name: 'Citizen Matters - Bangalore',
-        url: 'https://citizenmatters.in/bengaluru/feed/',
+        url: 'https://citizenmatters.in/feed/',
         description: 'In-depth civic and community journalism',
         priority: 8,
         language: 'en',

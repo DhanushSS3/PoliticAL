@@ -1,5 +1,7 @@
-import { Controller, Get, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Query, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
+import { SessionGuard } from '../auth/guards/session.guard';
+import { GeoAccessGuard } from '../auth/guards/geo-access.guard';
 
 @Controller('v1/dashboard')
 export class DashboardController {
@@ -22,5 +24,14 @@ export class DashboardController {
     @Get('historical-stats')
     async getHistoricalStats() {
         return this.dashboardService.getHistoricalStats();
+    }
+
+    @Get('religion-distribution')
+    @UseGuards(SessionGuard, GeoAccessGuard)
+    async getReligionDistribution(
+        @Query('geoUnitId', ParseIntPipe) geoUnitId: number,
+        @Query('year', new ParseIntPipe({ optional: true })) year?: number,
+    ) {
+        return this.dashboardService.getReligionDistribution(geoUnitId, year);
     }
 }

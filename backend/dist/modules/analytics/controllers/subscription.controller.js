@@ -16,6 +16,7 @@ exports.SubscriptionController = void 0;
 const common_1 = require("@nestjs/common");
 const monitoring_manager_service_1 = require("../services/monitoring-manager.service");
 const create_candidate_dto_1 = require("../dto/create-candidate.dto");
+const activate_entity_dto_1 = require("../dto/activate-entity.dto");
 let SubscriptionController = class SubscriptionController {
     constructor(monitoringManager) {
         this.monitoringManager = monitoringManager;
@@ -43,6 +44,16 @@ let SubscriptionController = class SubscriptionController {
         return {
             message: `Monitoring activated for GeoUnit #${id}`,
         };
+    }
+    async activateEntity(dto) {
+        const result = await this.monitoringManager.activateEntityWithKeywords({
+            entityType: dto.entityType,
+            entityId: dto.entityId,
+            priority: dto.priority,
+            reason: dto.reason,
+            triggeredByCandidateId: dto.triggeredByCandidateId,
+        });
+        return Object.assign({ success: true, message: `Monitoring activated for ${dto.entityType} #${dto.entityId}` }, result);
     }
     async createCandidate(dto) {
         const result = await this.monitoringManager.createCandidate(dto.fullName, dto.partyId, dto.constituencyId, dto.age, dto.gender);
@@ -77,6 +88,13 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", Promise)
 ], SubscriptionController.prototype, "subscribeToGeoUnit", null);
+__decorate([
+    (0, common_1.Post)("entities"),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [activate_entity_dto_1.ActivateEntityDto]),
+    __metadata("design:returntype", Promise)
+], SubscriptionController.prototype, "activateEntity", null);
 __decorate([
     (0, common_1.Post)("candidates"),
     __param(0, (0, common_1.Body)()),

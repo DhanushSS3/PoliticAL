@@ -86,6 +86,17 @@ enum AlertType {
   DAILY_PULSE
 }
 
+enum Religion {
+  HINDU
+  MUSLIM
+  CHRISTIAN
+  SIKH
+  BUDDHIST
+  JAIN
+  OTHER
+  NOT_STATED
+}
+
 // ============================================================================
 // GEOGRAPHY (Future-proof, but minimal for v0)
 // ============================================================================
@@ -112,6 +123,7 @@ model GeoUnit {
   sentimentSignals     SentimentSignal[]
   dailyStats           DailyGeoStats[]
   candidateProfiles    CandidateProfile[]
+  religionStats        GeoReligionStat[]
 
   createdAt DateTime @default(now())
 
@@ -536,6 +548,22 @@ model GeoAccess {
 
   @@id([subscriptionId, geoUnitId])
   @@index([geoUnitId])
+}
+
+model GeoReligionStat {
+  id         Int      @id @default(autoincrement())
+  geoUnitId  Int
+  year       Int
+  source     String
+  religion   Religion
+  population Int
+  percent    Float?
+
+  geoUnit    GeoUnit @relation(fields: [geoUnitId], references: [id], onDelete: Restrict)
+
+  @@index([geoUnitId, year])
+  @@index([religion])
+  @@unique([geoUnitId, year, religion])
 }
 
 // ============================================================================

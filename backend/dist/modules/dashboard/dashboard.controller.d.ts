@@ -5,4 +5,5 @@ export declare class DashboardController {
     getSummary(electionId?: string, stateId?: string, someIntParam?: number): Promise<unknown>;
     getPartyStats(electionId: string): Promise<unknown>;
     getHistoricalStats(): Promise<unknown>;
+    getReligionDistribution(geoUnitId: number, year?: number): Promise<unknown>;
 }

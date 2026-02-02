@@ -3,6 +3,13 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { GeoAttributionResolverService } from "./geo-attribution-resolver.service";
 import { RelevanceCalculatorService } from "../../analytics/services/relevance-calculator.service";
+export interface SentimentResponse {
+    label: string;
+    score: number;
+    confidence: number;
+    model_version: string;
+    language?: string;
+}
 export declare class SentimentAnalysisService {
     private readonly httpService;
     private readonly configService;
@@ -13,4 +20,5 @@ export declare class SentimentAnalysisService {
     private readonly analysisServiceUrl;
     constructor(httpService: HttpService, configService: ConfigService, prisma: PrismaService, geoResolver: GeoAttributionResolverService, relevanceCalculator: RelevanceCalculatorService);
     analyzeAndStoreSentiment(articleId: number, content: string, explicitGeoUnitId?: number): Promise<void>;
+    analyzeText(content: string): Promise<SentimentResponse>;
 }

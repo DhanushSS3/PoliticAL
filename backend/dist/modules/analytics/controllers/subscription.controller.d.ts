@@ -1,5 +1,6 @@
 import { MonitoringManagerService } from "../services/monitoring-manager.service";
 import { CreateCandidateDto } from "../dto/create-candidate.dto";
+import { ActivateEntityDto } from "../dto/activate-entity.dto";
 export declare class SubscriptionController {
     private readonly monitoringManager;
     constructor(monitoringManager: MonitoringManagerService);
@@ -28,6 +29,15 @@ export declare class SubscriptionController {
         }[];
     }>;
     subscribeToGeoUnit(id: number): Promise<{
+        message: string;
+    }>;
+    activateEntity(dto: ActivateEntityDto): Promise<{
+        entityType: import(".prisma/client").$Enums.EntityType;
+        entityId: number;
+        priority: number;
+        reason: string;
+        displayName: string;
+        success: boolean;
         message: string;
     }>;
     createCandidate(dto: CreateCandidateDto): Promise<{

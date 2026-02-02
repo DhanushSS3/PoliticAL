@@ -168,6 +168,22 @@ export class NewsIngestionService {
         return;
       }
 
+      // ✅ CRITICAL: Strict Verification - Ensure the entity name actually exists in the text
+      // Google News often returns "relevant" results that don't strictly contain the name.
+      const entityName = await this.getEntityName(entityType, entityId);
+      if (entityName) {
+        const escapedName = entityName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`\\b${escapedName}\\b`, 'i');
+        const fullTextForCheck = `${title} ${summary}`;
+
+        if (!regex.test(fullTextForCheck)) {
+          this.logger.debug(
+            `Strict check failed: "${entityName}" not found in article "${title}". Skipping.`,
+          );
+          return;
+        }
+      }
+
       // 1. Deduplication Check
       const existing = await this.prisma.newsArticle.findFirst({
         where: { sourceUrl: link },
@@ -281,5 +297,22 @@ export class NewsIngestionService {
     }
 
     return [baseQuery];
+  }
+
+  /**
+   * Helper to retrieve entity name for strict verification
+   */
+  private async getEntityName(type: EntityType, id: number): Promise<string | null> {
+    if (type === EntityType.CANDIDATE) {
+      const c = await this.prisma.candidate.findUnique({ where: { id }, select: { fullName: true } });
+      return c?.fullName || null;
+    } else if (type === EntityType.PARTY) {
+      const p = await this.prisma.party.findUnique({ where: { id }, select: { name: true } });
+      return p?.name || null;
+    } else if (type === EntityType.GEO_UNIT) {
+      const g = await this.prisma.geoUnit.findUnique({ where: { id }, select: { name: true } });
+      return g?.name || null;
+    }
+    return null;
   }
 }

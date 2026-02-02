@@ -7,4 +7,6 @@ export declare class NewsIntelligenceController {
     getHeadToHead(req: any, candidate1Id: number, candidate2Id: number, days?: number): Promise<unknown>;
     getNewsImpact(req: any, geoUnitId?: string, days?: number): Promise<unknown>;
     getLiveFeed(req: any, geoUnitId?: string, partyId?: number, limit?: number): Promise<unknown>;
+    getDashboardSentiment(days?: number): Promise<unknown>;
+    getDashboardNewsImpact(days?: number, partyLimit?: number): Promise<unknown>;
 }

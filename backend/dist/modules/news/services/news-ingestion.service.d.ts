@@ -19,4 +19,5 @@ export declare class NewsIngestionService {
     private processFeedItem;
     private getArticleAgeInHours;
     buildEnhancedQuery(entityType: EntityType, entityId: number): Promise<string[]>;
+    private getEntityName;
 }

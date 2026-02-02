@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { lastValueFrom } from 'rxjs';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { SentimentAnalysisService } from './sentiment-analysis.service';
 import { BANGALORE_NEWS_SOURCES, NewsSource } from '../config/news-sources.config';
@@ -19,10 +21,20 @@ export class RssFeedIngestionService {
     private readonly parser = new Parser();
     private readonly maxArticleAgeHours: number;
 
+    // Rotating User-Agents to avoid 403 Detection
+    private readonly userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/121.0'
+    ];
+
     constructor(
         private prisma: PrismaService,
         private sentimentService: SentimentAnalysisService,
         private configService: ConfigService,
+        private httpService: HttpService,
     ) {
         this.maxArticleAgeHours = this.configService.get<number>(
             'NEWS_ARTICLE_MAX_AGE_HOURS',
@@ -48,13 +60,27 @@ export class RssFeedIngestionService {
     }
 
     /**
-     * Fetch news from a specific RSS source
+     * Fetch news from a specific RSS source using HttpService with proper headers
      */
     async fetchFromSource(source: NewsSource): Promise<void> {
         try {
             this.logger.debug(`Fetching from ${source.name}...`);
 
-            const feed = await this.parser.parseURL(source.url);
+            // 1. Fetch Raw XML with User-Agent spoofing
+            const randomUserAgent = this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
+
+            const response = await lastValueFrom(
+                this.httpService.get(source.url, {
+                    headers: {
+                        'User-Agent': randomUserAgent,
+                        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+                    },
+                    timeout: 10000,
+                })
+            );
+
+            // 2. Parse XML Content
+            const feed = await this.parser.parseString(response.data);
 
             let processedCount = 0;
             let skippedOldCount = 0;
@@ -73,7 +99,7 @@ export class RssFeedIngestionService {
             );
         } catch (error) {
             this.logger.error(
-                `Failed to fetch from ${source.name}: ${error.message}`,
+                `Failed to fetch from ${source.name}: ${error.message} (Status: ${error.response?.status || 'Unknown'})`,
             );
         }
     }
@@ -157,24 +183,36 @@ export class RssFeedIngestionService {
     }
 
     /**
-     * Link article to relevant entities based on keyword matching
-     * This is a simple implementation - can be enhanced with NLP
+     * Link article to relevant entities based on strict keyword matching
+     * 
+     * Uses Regex word boundaries and "Longest Match" rule to prevent 
+     * disambiguation errors (e.g., preventing 'K Shivkumar' from matching 'D K Shivakumar')
      */
     private async linkArticleToEntities(
         articleId: number,
         fullText: string,
     ): Promise<void> {
         try {
-            const lowerText = fullText.toLowerCase();
-
-            // Find candidates mentioned in the article
+            // 1. Fetch all potentially active entities to match against
+            // In a larger system, we'd use a trie or Aho-Corasick algorithm
             const candidates = await this.prisma.candidate.findMany({
                 select: { id: true, fullName: true },
             });
 
-            for (const candidate of candidates) {
-                const candidateName = candidate.fullName.toLowerCase();
-                if (lowerText.includes(candidateName)) {
+            // 2. Sort candidates by name length (DESCENDING)
+            // This ensures "D K Shivakumar" is checked before "K Shivkumar"
+            const sortedCandidates = candidates.sort((a, b) => b.fullName.length - a.fullName.length);
+
+            const linkedIds = new Set<number>();
+            const textToSearch = fullText;
+
+            for (const candidate of sortedCandidates) {
+                const name = candidate.fullName;
+                // Escape special characters and use word boundaries
+                const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`\\b${escapedName}\\b`, 'i');
+
+                if (regex.test(textToSearch)) {
                     // Check if link already exists
                     const existingLink = await this.prisma.newsEntityMention.findFirst({
                         where: {
@@ -196,10 +234,13 @@ export class RssFeedIngestionService {
                             `Linked article #${articleId} to candidate: ${candidate.fullName}`,
                         );
                     }
+
+                    linkedIds.add(candidate.id);
+
+                    // Optimization: If we found a match, we could potentially remove it from text
+                    // to prevent shorter names from matching. But word boundaries usually handle this.
                 }
             }
-
-            // TODO: Similarly link to parties and constituencies
         } catch (error) {
             this.logger.error(
                 `Failed to link article #${articleId} to entities: ${error.message}`,

@@ -35,6 +35,12 @@ let NewsIntelligenceController = class NewsIntelligenceController {
     async getLiveFeed(req, geoUnitId, partyId, limit) {
         return this.newsIntelligenceService.getLiveFeed(geoUnitId, partyId, limit || 20, req.user.id);
     }
+    async getDashboardSentiment(days) {
+        return this.newsIntelligenceService.getDashboardSentiment(days || 7);
+    }
+    async getDashboardNewsImpact(days, partyLimit) {
+        return this.newsIntelligenceService.getDashboardNewsImpact(days || 7, partyLimit || 3);
+    }
 };
 exports.NewsIntelligenceController = NewsIntelligenceController;
 __decorate([
@@ -84,6 +90,21 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, Number, Number]),
     __metadata("design:returntype", Promise)
 ], NewsIntelligenceController.prototype, "getLiveFeed", null);
+__decorate([
+    (0, common_1.Get)('dashboard-sentiment'),
+    __param(0, (0, common_1.Query)('days', new common_1.ParseIntPipe({ optional: true }))),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", Promise)
+], NewsIntelligenceController.prototype, "getDashboardSentiment", null);
+__decorate([
+    (0, common_1.Get)('dashboard-news-impact'),
+    __param(0, (0, common_1.Query)('days', new common_1.ParseIntPipe({ optional: true }))),
+    __param(1, (0, common_1.Query)('partyLimit', new common_1.ParseIntPipe({ optional: true }))),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number]),
+    __metadata("design:returntype", Promise)
+], NewsIntelligenceController.prototype, "getDashboardNewsImpact", null);
 exports.NewsIntelligenceController = NewsIntelligenceController = __decorate([
     (0, common_1.Controller)('v1/news-intelligence'),
     (0, common_1.UseGuards)(session_guard_1.SessionGuard),

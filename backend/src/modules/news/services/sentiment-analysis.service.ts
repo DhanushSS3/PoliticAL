@@ -7,11 +7,12 @@ import { RelevanceCalculatorService } from "../../analytics/services/relevance-c
 import { firstValueFrom } from "rxjs";
 import { DataSourceType, EntityType, SentimentLabel } from "@prisma/client";
 
-interface SentimentResponse {
+export interface SentimentResponse {
   label: string; // POSITIVE, NEUTRAL, NEGATIVE
   score: number;
   confidence: number;
   model_version: string;
+  language?: string; // Detected language (if provided by analysis service)
 }
 
 @Injectable()
@@ -120,6 +121,34 @@ export class SentimentAnalysisService {
         `Sentiment analysis failed for article #${articleId}: ${error.message}`,
       );
       // Non-blocking: we catch error so ingestion continues
+    }
+  }
+
+  /**
+   * Analyze text and return raw sentiment response WITHOUT storing signals.
+   * Useful for admin preview/debug APIs.
+   */
+  async analyzeText(content: string): Promise<SentimentResponse> {
+    try {
+      this.logger.debug("Requesting sentiment analysis preview");
+
+      const { data } = await firstValueFrom(
+        this.httpService.post<SentimentResponse>(
+          `${this.analysisServiceUrl}/analyze/sentiment`,
+          {
+            content,
+            language: "auto", // Python service handles detection
+            context: "political_news",
+          },
+        ),
+      );
+
+      return data;
+    } catch (error) {
+      this.logger.error(
+        `Sentiment analysis preview failed: ${error.message}`,
+      );
+      throw error;
     }
   }
 }

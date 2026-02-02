@@ -235,4 +235,63 @@ export class DashboardService {
         await this.cacheService.set(cacheKey, result, 3600);
         return result;
     }
+
+    async getReligionDistribution(geoUnitId: number, year?: number) {
+        if (!geoUnitId) {
+            return [];
+        }
+
+        // Determine target year: use provided year or latest available for this geo unit
+        let targetYear = year;
+
+        if (!targetYear) {
+            const latest = await this.prisma.geoReligionStat.findFirst({
+                where: { geoUnitId },
+                orderBy: { year: 'desc' },
+            });
+
+            if (!latest) {
+                return [];
+            }
+
+            targetYear = latest.year;
+        }
+
+        const cacheKey = `dashboard:religion:${geoUnitId}:${targetYear}`;
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached) return cached;
+
+        const stats = await this.prisma.geoReligionStat.findMany({
+            where: {
+                geoUnitId,
+                year: targetYear,
+            },
+            orderBy: { religion: 'asc' },
+        });
+
+        if (!stats || stats.length === 0) {
+            return [];
+        }
+
+        const totalPopulation = stats.reduce((sum, s) => sum + (s.population || 0), 0);
+
+        const result = stats.map((s) => {
+            const percent =
+                s.percent != null
+                    ? parseFloat(s.percent.toFixed(2))
+                    : totalPopulation > 0
+                        ? parseFloat(((s.population / totalPopulation) * 100).toFixed(2))
+                        : 0;
+
+            return {
+                religion: s.religion,
+                population: s.population,
+                percent,
+                year: s.year,
+            };
+        });
+
+        await this.cacheService.set(cacheKey, result, 600);
+        return result;
+    }
 }

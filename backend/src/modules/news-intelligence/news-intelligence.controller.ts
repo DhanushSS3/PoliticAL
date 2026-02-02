@@ -69,4 +69,19 @@ export class NewsIntelligenceController {
     ) {
         return this.newsIntelligenceService.getLiveFeed(geoUnitId, partyId, limit || 20, req.user.id);
     }
+
+    @Get('dashboard-sentiment')
+    async getDashboardSentiment(
+        @Query('days', new ParseIntPipe({ optional: true })) days?: number,
+    ) {
+        return this.newsIntelligenceService.getDashboardSentiment(days || 7);
+    }
+
+    @Get('dashboard-news-impact')
+    async getDashboardNewsImpact(
+        @Query('days', new ParseIntPipe({ optional: true })) days?: number,
+        @Query('partyLimit', new ParseIntPipe({ optional: true })) partyLimit?: number,
+    ) {
+        return this.newsIntelligenceService.getDashboardNewsImpact(days || 7, partyLimit || 3);
+    }
 }

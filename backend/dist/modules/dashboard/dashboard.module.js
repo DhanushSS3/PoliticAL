@@ -10,14 +10,16 @@ exports.DashboardModule = void 0;
 const common_1 = require("@nestjs/common");
 const dashboard_controller_1 = require("./dashboard.controller");
 const dashboard_service_1 = require("./dashboard.service");
+const auth_module_1 = require("../auth/auth.module");
+const geo_access_guard_1 = require("../auth/guards/geo-access.guard");
 let DashboardModule = class DashboardModule {
 };
 exports.DashboardModule = DashboardModule;
 exports.DashboardModule = DashboardModule = __decorate([
     (0, common_1.Module)({
-        imports: [],
+        imports: [auth_module_1.AuthModule],
         controllers: [dashboard_controller_1.DashboardController],
-        providers: [dashboard_service_1.DashboardService],
+        providers: [dashboard_service_1.DashboardService, geo_access_guard_1.GeoAccessGuard],
     })
 ], DashboardModule);
 //# sourceMappingURL=dashboard.module.js.map

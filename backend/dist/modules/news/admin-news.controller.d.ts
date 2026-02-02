@@ -16,6 +16,14 @@ export declare class AdminNewsController {
         message: string;
         articleId: number;
     }>;
+    previewSentiment(dto: ManualNewsIngestionDto, file: Express.Multer.File): Promise<{
+        message: string;
+        inputType: import(".prisma/client").$Enums.ManualInputType;
+        title: string;
+        sourceUrl: string;
+        contentPreview: string;
+        sentiment: import("./services/sentiment-analysis.service").SentimentResponse;
+    }>;
     addKeyword(dto: AddKeywordDto): Promise<{
         message: string;
         keyword: {

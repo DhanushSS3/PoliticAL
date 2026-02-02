@@ -85,6 +85,47 @@ let AdminNewsController = class AdminNewsController {
             articleId: article.id,
         };
     }
+    async previewSentiment(dto, file) {
+        let content = "";
+        let sourceUrl = "";
+        let title = dto.title || "Manual Entry";
+        if (dto.inputType === client_1.ManualInputType.FILE) {
+            if (!file)
+                throw new common_1.BadRequestException("File is required for FILE input type");
+            content = await this.fileParsingService.parseFile(file.buffer, file.originalname);
+            sourceUrl = `file://${file.originalname}`;
+            title = file.originalname;
+        }
+        else if (dto.inputType === client_1.ManualInputType.LINK) {
+            if (!dto.linkUrl)
+                throw new common_1.BadRequestException("Link URL is required for LINK input type");
+            if (!dto.textContent)
+                throw new common_1.BadRequestException("Text content is required for LINK input type preview until link fetching is implemented");
+            sourceUrl = dto.linkUrl;
+            content = dto.textContent;
+        }
+        else if (dto.inputType === client_1.ManualInputType.TEXT) {
+            if (!dto.textContent)
+                throw new common_1.BadRequestException("Text content is required for TEXT input type");
+            content = dto.textContent;
+            sourceUrl = "manual://text-entry";
+        }
+        else {
+            throw new common_1.BadRequestException("Unsupported input type");
+        }
+        if (!content) {
+            throw new common_1.BadRequestException("No content could be extracted");
+        }
+        const sentiment = await this.sentimentService.analyzeText(content);
+        return {
+            message: "Sentiment preview generated successfully",
+            inputType: dto.inputType,
+            title,
+            sourceUrl,
+            contentPreview: content.substring(0, 500),
+            sentiment,
+        };
+    }
     async addKeyword(dto) {
         const result = await this.keywordManager.addKeyword(dto.entityType, dto.entityId, dto.keyword, dto.priority || 5);
         return {
@@ -112,6 +153,16 @@ __decorate([
     __metadata("design:paramtypes", [manual_ingestion_dto_1.ManualNewsIngestionDto, Object]),
     __metadata("design:returntype", Promise)
 ], AdminNewsController.prototype, "createManualNews", null);
+__decorate([
+    (0, common_1.Post)("preview-sentiment"),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)("file")),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.UploadedFile)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [manual_ingestion_dto_1.ManualNewsIngestionDto, Object]),
+    __metadata("design:returntype", Promise)
+], AdminNewsController.prototype, "previewSentiment", null);
 __decorate([
     (0, common_1.Post)("keywords"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),

@@ -9,3 +9,8 @@ spacy==3.7.2
 torch>=2.2.0
 transformers>=4.36.0
 langdetect==1.0.9
+requests>=2.31.0
+pandas
+openpyxl
+psycopg2-binary
+python-dotenv

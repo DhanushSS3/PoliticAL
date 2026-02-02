@@ -355,6 +355,169 @@ let NewsIntelligenceService = NewsIntelligenceService_1 = class NewsIntelligence
         await this.cacheService.set(cacheKey, result, 300);
         return result;
     }
+    async getDashboardSentiment(days = 7, partyLimit = 3) {
+        const cacheKey = `dashboard:sentiment:top:${partyLimit}:${days}`;
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached)
+            return cached;
+        const latestElection = await this.prisma.election.findFirst({
+            orderBy: { year: 'desc' },
+        });
+        const emptyResult = {
+            overall: { positive: 0, neutral: 0, negative: 0 },
+            byParty: {},
+        };
+        if (!latestElection) {
+            await this.cacheService.set(cacheKey, emptyResult, 300);
+            return emptyResult;
+        }
+        const topParties = await this.prisma.partySeatSummary.findMany({
+            where: { electionId: latestElection.id },
+            include: { party: true },
+            orderBy: { seatsWon: 'desc' },
+            take: partyLimit,
+        });
+        if (topParties.length === 0) {
+            await this.cacheService.set(cacheKey, emptyResult, 300);
+            return emptyResult;
+        }
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const byParty = {};
+        let totalPositive = 0;
+        let totalNeutral = 0;
+        let totalNegative = 0;
+        for (const stat of topParties) {
+            const code = stat.party.symbol || stat.party.name.substring(0, 3).toUpperCase();
+            const signals = await this.prisma.sentimentSignal.findMany({
+                where: {
+                    sourceEntityType: client_1.EntityType.PARTY,
+                    sourceEntityId: stat.partyId,
+                    createdAt: { gte: cutoff },
+                },
+            });
+            const positiveCount = signals.filter((s) => s.sentiment === client_1.SentimentLabel.POSITIVE).length;
+            const negativeCount = signals.filter((s) => s.sentiment === client_1.SentimentLabel.NEGATIVE).length;
+            const neutralCount = signals.filter((s) => s.sentiment === client_1.SentimentLabel.NEUTRAL).length;
+            const total = positiveCount + negativeCount + neutralCount || 1;
+            const partyStats = {
+                positive: Math.round((positiveCount / total) * 100),
+                neutral: Math.round((neutralCount / total) * 100),
+                negative: Math.round((negativeCount / total) * 100),
+            };
+            byParty[code] = partyStats;
+            totalPositive += positiveCount;
+            totalNeutral += neutralCount;
+            totalNegative += negativeCount;
+        }
+        const overallTotal = totalPositive + totalNeutral + totalNegative || 1;
+        const overall = {
+            positive: Math.round((totalPositive / overallTotal) * 100),
+            neutral: Math.round((totalNeutral / overallTotal) * 100),
+            negative: Math.round((totalNegative / overallTotal) * 100),
+        };
+        const result = { overall, byParty };
+        await this.cacheService.set(cacheKey, result, 300);
+        return result;
+    }
+    async getDashboardNewsImpact(days = 7, partyLimit = 3) {
+        const cacheKey = `dashboard:news-impact:top:${partyLimit}:${days}`;
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached)
+            return cached;
+        const latestElection = await this.prisma.election.findFirst({
+            orderBy: { year: 'desc' },
+        });
+        const baseResult = {
+            impactTopics: [],
+            headlines: [],
+        };
+        if (!latestElection) {
+            await this.cacheService.set(cacheKey, baseResult, 300);
+            return baseResult;
+        }
+        const topParties = await this.prisma.partySeatSummary.findMany({
+            where: { electionId: latestElection.id },
+            include: { party: true },
+            orderBy: { seatsWon: 'desc' },
+            take: partyLimit,
+        });
+        if (topParties.length === 0) {
+            await this.cacheService.set(cacheKey, baseResult, 300);
+            return baseResult;
+        }
+        const partyIds = topParties.map((p) => p.partyId);
+        const partyCodeMap = new Map();
+        for (const stat of topParties) {
+            const code = stat.party.symbol || stat.party.name.substring(0, 3).toUpperCase();
+            partyCodeMap.set(stat.partyId, code);
+        }
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const articles = await this.prisma.newsArticle.findMany({
+            where: {
+                status: 'APPROVED',
+                publishedAt: { gte: cutoff },
+                entityMentions: {
+                    some: {
+                        entityType: client_1.EntityType.PARTY,
+                        entityId: { in: partyIds },
+                    },
+                },
+            },
+            include: {
+                sentimentSignals: true,
+                entityMentions: true,
+            },
+            orderBy: { publishedAt: 'desc' },
+            take: 50,
+        });
+        if (articles.length === 0) {
+            await this.cacheService.set(cacheKey, baseResult, 300);
+            return baseResult;
+        }
+        const items = articles.map((a) => {
+            const partyMention = a.entityMentions.find((m) => m.entityType === client_1.EntityType.PARTY &&
+                partyIds.includes(m.entityId));
+            const partyId = partyMention === null || partyMention === void 0 ? void 0 : partyMention.entityId;
+            const partyCode = partyId ? partyCodeMap.get(partyId) || 'OTHER' : 'OTHER';
+            const sentimentSignal = a.sentimentSignals[0];
+            let sentiment = 'neutral';
+            if ((sentimentSignal === null || sentimentSignal === void 0 ? void 0 : sentimentSignal.sentiment) === client_1.SentimentLabel.POSITIVE) {
+                sentiment = 'positive';
+            }
+            else if ((sentimentSignal === null || sentimentSignal === void 0 ? void 0 : sentimentSignal.sentiment) === client_1.SentimentLabel.NEGATIVE) {
+                sentiment = 'negative';
+            }
+            const baseScore = Math.abs((sentimentSignal === null || sentimentSignal === void 0 ? void 0 : sentimentSignal.sentimentScore) || 0);
+            const virality = this.calculateVirality(a);
+            const viralityBoost = virality === 'VIRAL' ? 1.5 : virality === 'TRENDING' ? 1.2 : 1;
+            const impactScore = baseScore * viralityBoost || 0.1;
+            return {
+                id: a.id,
+                title: a.title,
+                sentiment,
+                partyCode,
+                impactScore,
+                publishedAt: a.publishedAt,
+            };
+        });
+        const totalImpact = items.reduce((sum, item) => sum + item.impactScore, 0) || 1;
+        const impactTopics = items.slice(0, 5).map((item) => ({
+            topic: item.title,
+            impact: Math.round((item.impactScore / totalImpact) * 100),
+            sentiment: item.sentiment,
+            party: item.partyCode,
+        }));
+        const headlines = items.slice(0, 10).map((item) => ({
+            id: item.id,
+            headline: item.title,
+            sentiment: item.sentiment,
+            party: item.partyCode,
+            time: this.formatRelativeTime(item.publishedAt),
+        }));
+        const result = Object.assign(Object.assign({}, baseResult), { impactTopics, headlines });
+        await this.cacheService.set(cacheKey, result, 300);
+        return result;
+    }
     async getPartyWave(partyId) {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         const stateSentiments = await this.prisma.sentimentSignal.findMany({

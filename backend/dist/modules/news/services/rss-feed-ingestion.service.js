@@ -13,18 +13,28 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RssFeedIngestionService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
+const axios_1 = require("@nestjs/axios");
+const rxjs_1 = require("rxjs");
 const prisma_service_1 = require("../../../prisma/prisma.service");
 const sentiment_analysis_service_1 = require("./sentiment-analysis.service");
 const news_sources_config_1 = require("../config/news-sources.config");
 const client_1 = require("@prisma/client");
 const Parser = require('rss-parser');
 let RssFeedIngestionService = RssFeedIngestionService_1 = class RssFeedIngestionService {
-    constructor(prisma, sentimentService, configService) {
+    constructor(prisma, sentimentService, configService, httpService) {
         this.prisma = prisma;
         this.sentimentService = sentimentService;
         this.configService = configService;
+        this.httpService = httpService;
         this.logger = new common_1.Logger(RssFeedIngestionService_1.name);
         this.parser = new Parser();
+        this.userAgents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/121.0'
+        ];
         this.maxArticleAgeHours = this.configService.get('NEWS_ARTICLE_MAX_AGE_HOURS', 48);
     }
     async fetchFromAllSources() {
@@ -36,9 +46,18 @@ let RssFeedIngestionService = RssFeedIngestionService_1 = class RssFeedIngestion
         this.logger.log('✅ RSS feed ingestion completed');
     }
     async fetchFromSource(source) {
+        var _a;
         try {
             this.logger.debug(`Fetching from ${source.name}...`);
-            const feed = await this.parser.parseURL(source.url);
+            const randomUserAgent = this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
+            const response = await (0, rxjs_1.lastValueFrom)(this.httpService.get(source.url, {
+                headers: {
+                    'User-Agent': randomUserAgent,
+                    'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+                },
+                timeout: 10000,
+            }));
+            const feed = await this.parser.parseString(response.data);
             let processedCount = 0;
             let skippedOldCount = 0;
             let skippedDuplicateCount = 0;
@@ -54,7 +73,7 @@ let RssFeedIngestionService = RssFeedIngestionService_1 = class RssFeedIngestion
             this.logger.log(`${source.name}: Processed ${processedCount}, Skipped (old: ${skippedOldCount}, duplicate: ${skippedDuplicateCount})`);
         }
         catch (error) {
-            this.logger.error(`Failed to fetch from ${source.name}: ${error.message}`);
+            this.logger.error(`Failed to fetch from ${source.name}: ${error.message} (Status: ${((_a = error.response) === null || _a === void 0 ? void 0 : _a.status) || 'Unknown'})`);
         }
     }
     async processRssItem(item, source) {
@@ -105,13 +124,17 @@ let RssFeedIngestionService = RssFeedIngestionService_1 = class RssFeedIngestion
     }
     async linkArticleToEntities(articleId, fullText) {
         try {
-            const lowerText = fullText.toLowerCase();
             const candidates = await this.prisma.candidate.findMany({
                 select: { id: true, fullName: true },
             });
-            for (const candidate of candidates) {
-                const candidateName = candidate.fullName.toLowerCase();
-                if (lowerText.includes(candidateName)) {
+            const sortedCandidates = candidates.sort((a, b) => b.fullName.length - a.fullName.length);
+            const linkedIds = new Set();
+            const textToSearch = fullText;
+            for (const candidate of sortedCandidates) {
+                const name = candidate.fullName;
+                const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`\\b${escapedName}\\b`, 'i');
+                if (regex.test(textToSearch)) {
                     const existingLink = await this.prisma.newsEntityMention.findFirst({
                         where: {
                             articleId,
@@ -129,6 +152,7 @@ let RssFeedIngestionService = RssFeedIngestionService_1 = class RssFeedIngestion
                         });
                         this.logger.debug(`Linked article #${articleId} to candidate: ${candidate.fullName}`);
                     }
+                    linkedIds.add(candidate.id);
                 }
             }
         }
@@ -142,6 +166,7 @@ exports.RssFeedIngestionService = RssFeedIngestionService = RssFeedIngestionServ
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         sentiment_analysis_service_1.SentimentAnalysisService,
-        config_1.ConfigService])
+        config_1.ConfigService,
+        axios_1.HttpService])
 ], RssFeedIngestionService);
 //# sourceMappingURL=rss-feed-ingestion.service.js.map

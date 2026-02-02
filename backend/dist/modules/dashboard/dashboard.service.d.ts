@@ -9,4 +9,5 @@ export declare class DashboardService {
     getSummary(electionId?: string): Promise<unknown>;
     getPartyStats(electionId: string): Promise<unknown>;
     getHistoricalStats(): Promise<unknown>;
+    getReligionDistribution(geoUnitId: number, year?: number): Promise<unknown>;
 }

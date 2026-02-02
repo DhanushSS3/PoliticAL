@@ -98,6 +98,16 @@ let NewsIngestionService = NewsIngestionService_1 = class NewsIngestionService {
                 this.logger.debug(`Skipping old article (${articleAgeHours.toFixed(1)}h old): "${title}"`);
                 return;
             }
+            const entityName = await this.getEntityName(entityType, entityId);
+            if (entityName) {
+                const escapedName = entityName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`\\b${escapedName}\\b`, 'i');
+                const fullTextForCheck = `${title} ${summary}`;
+                if (!regex.test(fullTextForCheck)) {
+                    this.logger.debug(`Strict check failed: "${entityName}" not found in article "${title}". Skipping.`);
+                    return;
+                }
+            }
             const existing = await this.prisma.newsArticle.findFirst({
                 where: { sourceUrl: link },
             });
@@ -169,6 +179,21 @@ let NewsIngestionService = NewsIngestionService_1 = class NewsIngestionService {
             return queries;
         }
         return [baseQuery];
+    }
+    async getEntityName(type, id) {
+        if (type === client_1.EntityType.CANDIDATE) {
+            const c = await this.prisma.candidate.findUnique({ where: { id }, select: { fullName: true } });
+            return (c === null || c === void 0 ? void 0 : c.fullName) || null;
+        }
+        else if (type === client_1.EntityType.PARTY) {
+            const p = await this.prisma.party.findUnique({ where: { id }, select: { name: true } });
+            return (p === null || p === void 0 ? void 0 : p.name) || null;
+        }
+        else if (type === client_1.EntityType.GEO_UNIT) {
+            const g = await this.prisma.geoUnit.findUnique({ where: { id }, select: { name: true } });
+            return (g === null || g === void 0 ? void 0 : g.name) || null;
+        }
+        return null;
     }
 };
 exports.NewsIngestionService = NewsIngestionService;

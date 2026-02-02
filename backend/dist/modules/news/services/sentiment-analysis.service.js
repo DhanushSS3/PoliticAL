@@ -77,6 +77,21 @@ let SentimentAnalysisService = SentimentAnalysisService_1 = class SentimentAnaly
             this.logger.error(`Sentiment analysis failed for article #${articleId}: ${error.message}`);
         }
     }
+    async analyzeText(content) {
+        try {
+            this.logger.debug("Requesting sentiment analysis preview");
+            const { data } = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.analysisServiceUrl}/analyze/sentiment`, {
+                content,
+                language: "auto",
+                context: "political_news",
+            }));
+            return data;
+        }
+        catch (error) {
+            this.logger.error(`Sentiment analysis preview failed: ${error.message}`);
+            throw error;
+        }
+    }
 };
 exports.SentimentAnalysisService = SentimentAnalysisService;
 exports.SentimentAnalysisService = SentimentAnalysisService = SentimentAnalysisService_1 = __decorate([

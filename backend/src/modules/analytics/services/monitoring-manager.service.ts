@@ -240,6 +240,54 @@ export class MonitoringManagerService {
     }
 
     /**
+     * Admin helper: Activate monitoring + seed keywords for any supported entity type
+     */
+    async activateEntityWithKeywords(options: {
+        entityType: EntityType;
+        entityId: number;
+        priority?: number;
+        reason?: string;
+        triggeredByCandidateId?: number;
+    }) {
+        const {
+            entityType,
+            entityId,
+            priority = 5,
+            reason = "ADMIN_OVERRIDE",
+            triggeredByCandidateId = 0,
+        } = options;
+
+        const displayName = await this.getEntityDisplayName(entityType, entityId);
+        if (!displayName) {
+            throw new BadRequestException(
+                `Unsupported or missing entity for monitoring: ${entityType} #${entityId}`,
+            );
+        }
+
+        await this.activateEntity(
+            entityType,
+            entityId,
+            reason,
+            triggeredByCandidateId,
+            priority,
+        );
+
+        await this.keywordManager.seedKeywordsForEntity(
+            entityType,
+            entityId,
+            displayName,
+        );
+
+        return {
+            entityType,
+            entityId,
+            priority,
+            reason,
+            displayName,
+        };
+    }
+
+    /**
      * Deactivate monitoring when subscription ends
      */
     async deactivateMonitoring(candidateId: number): Promise<void> {
@@ -333,6 +381,37 @@ export class MonitoringManagerService {
                 updatedAt: new Date(),
             },
         });
+    }
+
+    private async getEntityDisplayName(
+        entityType: EntityType,
+        entityId: number,
+    ): Promise<string | null> {
+        switch (entityType) {
+            case EntityType.CANDIDATE: {
+                const candidate = await this.prisma.candidate.findUnique({
+                    where: { id: entityId },
+                    select: { fullName: true },
+                });
+                return candidate?.fullName ?? null;
+            }
+            case EntityType.PARTY: {
+                const party = await this.prisma.party.findUnique({
+                    where: { id: entityId },
+                    select: { name: true },
+                });
+                return party?.name ?? null;
+            }
+            case EntityType.GEO_UNIT: {
+                const geo = await this.prisma.geoUnit.findUnique({
+                    where: { id: entityId },
+                    select: { name: true },
+                });
+                return geo?.name ?? null;
+            }
+            default:
+                return null;
+        }
     }
 
     /**

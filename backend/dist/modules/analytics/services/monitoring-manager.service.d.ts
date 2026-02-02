@@ -15,6 +15,19 @@ export declare class MonitoringManagerService {
         }>;
     }>;
     activateGeoMonitoring(geoUnitId: number): Promise<void>;
+    activateEntityWithKeywords(options: {
+        entityType: EntityType;
+        entityId: number;
+        priority?: number;
+        reason?: string;
+        triggeredByCandidateId?: number;
+    }): Promise<{
+        entityType: import(".prisma/client").$Enums.EntityType;
+        entityId: number;
+        priority: number;
+        reason: string;
+        displayName: string;
+    }>;
     deactivateMonitoring(candidateId: number): Promise<void>;
     getActiveEntities(): Promise<Array<{
         entityType: EntityType;
@@ -22,6 +35,7 @@ export declare class MonitoringManagerService {
     }>>;
     isEntityActive(entityType: EntityType, entityId: number): Promise<boolean>;
     private activateEntity;
+    private getEntityDisplayName;
     private seedKeywordsForActivatedEntities;
     activateGeoScope(geoUnitId: number): Promise<void>;
     createCandidate(fullName: string, partyId: number, constituencyId: number, age?: number, gender?: string): Promise<{
