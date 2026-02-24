@@ -1,9 +1,7 @@
 import dotenv from 'dotenv';
 
-// Only load .env file when running locally (not in production/Render)
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config({ path: './.env' });
-}
+// Load .env file in all environments
+dotenv.config({ path: './.env' });
 
 // Also merge variables from config.env in all environments so production/test get keys
 // Do not override already-set platform env vars
