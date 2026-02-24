@@ -5,7 +5,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 // - Otherwise use the current origin if running in a browser.
 // - Final fallback is the deployed production API URL.
 const VITE_ENV: any = (import.meta as any).env || {};
-const DEFAULT_API_URL = 'https://testing.careerredefine.com';
+const DEFAULT_API_URL = 'https://www.careerredefine.com';
 const API_URL: string =
   VITE_ENV?.VITE_API_URL
   || (typeof window !== 'undefined' && window.location?.origin)

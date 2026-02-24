@@ -549,8 +549,8 @@ if (queryForm) {
     // Determine the endpoint based on form type
     const isInterviewForm = this.querySelector('input[name="interview_date"]') !== null;
     const endpoint = isInterviewForm 
-      ? 'https://testing.careerredefine.com/api/book-interview' 
-      : 'https://testing.careerredefine.com/api/enquiry';
+      ? 'https://www.careerredefine.com/api/book-interview' 
+      : 'https://www.careerredefine.com/api/enquiry';
 
     // Submit to Node.js backend (robust handling like datascience.html)
     fetch(endpoint, {
@@ -1094,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(form);
         const formObject = Object.fromEntries(formData.entries());
         
-        const response = await fetch('https://testing.careerredefine.com/api/book-interview', {
+        const response = await fetch('https://www.careerredefine.com/api/book-interview', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

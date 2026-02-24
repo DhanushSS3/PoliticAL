@@ -24,7 +24,7 @@ const PremiumPage: React.FC = () => {
   const [mLoading, setMLoading] = useState(false);
   const [mError, setMError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', email: '', message: '' });
-  const API_URL = (import.meta as any).env?.VITE_API_URL || 'https://testing.careerredefine.com';
+  const API_URL = (import.meta as any).env?.VITE_API_URL || 'https://www.careerredefine.com';
   // Which detailed section is open; null => only show 5 cards
   const [active, setActive] = useState<null | 'exclusive-tools' | 'priority-support' | 'meetings' | 'groups' | 'materials' | 'premium-jobs'>(null);
   // Jobs state for admin-added jobs

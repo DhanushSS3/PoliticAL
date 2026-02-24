@@ -252,14 +252,14 @@ const allowedOrigins = [
   /^https?:\/\/([a-z0-9-]+\.)*career-redefine\.onrender\.com$/,
   
   // Specific production URLs
-  'https://test.testing.testing.careerredefine.com',
-  'https://www.test.testing.testing.careerredefine.com',
+  'https://www.careerredefine.com',
+  'https://www.careerredefine.com',
 
-  'https://testing.testing.careerredefine.com',
+  'https://www.careerredefine.com',
   'https://www.test5-x7xt.onrender.com',
 
   // Second testing domain
-  'https://testing.testing.careerredefine.com',
+  'https://www.careerredefine.com',
 
   'https://test.career-redefine.vercel.app',
   'https://test.career-redefine.com'
@@ -1297,7 +1297,7 @@ const startServer = async () => {
     // Initialize Socket.IO for realtime group chat
     const io = new SocketIOServer(serverInstance, {
       cors: {
-        origin: ['http://localhost:5173', 'http://127.0.0.1:5173','https://testing.testing.careerredefine.com'],
+        origin: ['http://localhost:5173', 'http://127.0.0.1:5173','https://www.careerredefine.com'],
         credentials: true,
       },
     });

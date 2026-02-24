@@ -21,7 +21,7 @@ export const naukriService = {
       const apiBase = (import.meta as any)?.env?.VITE_API_BASE
         || (typeof window !== 'undefined' && window.location?.origin)
         || (import.meta as any)?.env?.VITE_API_URL
-        || 'https://testing.careerredefine.com';
+        || 'https://www.careerredefine.com';
       const url = new URL('/api/v1/external/naukri', apiBase);
       if (params.keywords) url.searchParams.set('keywords', params.keywords);
       if (params.location) url.searchParams.set('location', params.location);

@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://testing.careerredefine.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://www.careerredefine.com';
 
 let socket: Socket | null = null;
 

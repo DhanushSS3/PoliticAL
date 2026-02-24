@@ -248,7 +248,7 @@ export const adminService = {
 
   createQuestion: async (payload: { subject?: string; message: string; name: string; email: string; phone?: string }) => {
     // Public questions endpoint (no auth). Use absolute URL to bypass interceptors/tokens.
-    const response = await axios.post('https://testing.careerredefine.com/api/v1/questions', payload, {
+    const response = await axios.post('https://www.careerredefine.com/api/v1/questions', payload, {
       headers: { 'Content-Type': 'application/json' },
       withCredentials: false,
     });
@@ -277,7 +277,7 @@ export const adminService = {
 
   createBooking: async (payload: { name: string; email: string; phone: string; date: string; timeSlot: string; type?: string; message?: string }) => {
     // Public bookings endpoint (no auth). Use absolute URL to bypass interceptors/tokens.
-    const response = await axios.post('https://testing.careerredefine.com/api/v1/bookings', payload, {
+    const response = await axios.post('https://www.careerredefine.com/api/v1/bookings', payload, {
       headers: { 'Content-Type': 'application/json' },
       withCredentials: false,
     });
